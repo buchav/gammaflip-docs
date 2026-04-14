@@ -87,6 +87,49 @@ components:
           type: string
           example: "free"
 
+  parameters:
+    Exchange:
+      name: exchange
+      in: path
+      required: true
+      description: Exchange name (`bybit`, `deribit`, `okx`) or `all` for aggregated data.
+      schema:
+        type: string
+        enum: [bybit, deribit, okx, all, combined]
+        example: "all"
+    Coin:
+      name: coin
+      in: path
+      required: true
+      description: Base coin symbol (uppercase).
+      schema:
+        type: string
+        example: "BTC"
+
+  responses:
+    Unauthorized:
+      description: Invalid or missing API key
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Subscription required
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: Daily rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema: { type: integer }
+        X-RateLimit-Remaining:
+          schema: { type: integer, example: 0 }
+        X-RateLimit-Reset:
+          schema: { type: string, format: date-time }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
 paths:
   /exchanges:
     get:
@@ -217,10 +260,12 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Envelope' }
-        '400': { description: Invalid exchange }
+        '400':
+          description: Invalid exchange
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { description: No data available for this coin/exchange }
+        '404':
+          description: No data available for this coin/exchange
         '429': { $ref: '#/components/responses/RateLimited' }
 
   /gex/by-strike-enhanced/{exchange}/{coin}/{expiration}:
@@ -249,51 +294,10 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Envelope' }
-        '400': { description: Invalid exchange }
+        '400':
+          description: Invalid exchange
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { description: No data available }
+        '404':
+          description: No data available
         '429': { $ref: '#/components/responses/RateLimited' }
-
-  parameters:
-    Exchange:
-      name: exchange
-      in: path
-      required: true
-      description: Exchange name (`bybit`, `deribit`, `okx`) or `all` for aggregated data.
-      schema:
-        type: string
-        enum: [bybit, deribit, okx, all, combined]
-        example: "all"
-    Coin:
-      name: coin
-      in: path
-      required: true
-      description: Base coin symbol (uppercase).
-      schema:
-        type: string
-        example: "BTC"
-
-  responses:
-    Unauthorized:
-      description: Invalid or missing API key
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/Error' }
-    Forbidden:
-      description: Subscription required
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/Error' }
-    RateLimited:
-      description: Daily rate limit exceeded
-      headers:
-        X-RateLimit-Limit:
-          schema: { type: integer }
-        X-RateLimit-Remaining:
-          schema: { type: integer, example: 0 }
-        X-RateLimit-Reset:
-          schema: { type: string, format: date-time }
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/Error' }
