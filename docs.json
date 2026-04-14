@@ -22,12 +22,6 @@
               "rate-limits",
               "errors"
             ]
-          },
-          {
-            "group": "MCP Integration",
-            "pages": [
-              "mcp-guide"
-            ]
           }
         ]
       },

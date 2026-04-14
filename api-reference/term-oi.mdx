@@ -6,11 +6,13 @@ description: 'Open Interest and Gamma Exposure per expiration, broken down by ex
 
 ## What it returns
 
-For each expiration date, this endpoint returns:
+For each non-expired expiration, this endpoint returns:
 
-- **Open Interest** (total contracts outstanding) per exchange
-- **Gamma Exposure** (total dealer gamma, in dollar terms) per exchange
-- **Aggregated totals** across all exchanges
+- **Open Interest** in USD (calls, puts, and total) per exchange
+- **Gamma Exposure** (total, upside, downside, absolute) per exchange
+- **Contract count** per exchange
+- **Aggregated totals** across all requested exchanges
+- **Per-expiration metadata** — date, days to expiry, timestamp
 
 Use this to understand how gamma and OI are distributed across the term
 structure, and to spot the expirations where dealer positioning is heaviest.
@@ -25,35 +27,70 @@ structure, and to spot the expirations where dealer positioning is heaviest.
   Base coin symbol (uppercase).
 </ParamField>
 
-## Response schema
-
-The response data follows the schema used internally by the GammaFlip dashboard.
-Shape at a glance:
+## Response shape
 
 ```json
 {
   "data": {
     "expirations": [
       {
-        "date": "25APR26",
-        "total_gex": 1234567890,
-        "total_oi": 45678,
-        "by_exchange": {
-          "bybit": { "gex": ..., "oi": ... },
-          "deribit": { "gex": ..., "oi": ... }
+        "date": "15APR26",
+        "days_to_expiry": 0,
+        "timestamp": "2026-04-15T00:00:00+00:00",
+        "exchanges": {
+          "deribit": {
+            "oi_usd": 252323000.06,
+            "call_oi_usd": 115940056.62,
+            "put_oi_usd": 136382943.44,
+            "contracts": 104,
+            "total_gex": -2481405.91,
+            "abs_gex": 23314299.33,
+            "upside_gex": 8007918.34,
+            "downside_gex": 15306380.99
+          }
+        },
+        "total": {
+          "oi_usd": 252323000.06,
+          "call_oi_usd": 115940056.62,
+          "put_oi_usd": 136382943.44,
+          "contracts": 104,
+          "total_gex": -2481405.91,
+          "abs_gex": 23314299.33,
+          "upside_gex": 8007918.34,
+          "downside_gex": 15306380.99
         }
       }
     ],
-    "metadata": { ... }
+    "metadata": {
+      "basecoin": "BTC",
+      "exchanges_used": ["deribit"],
+      "current_price": 74037.30,
+      "expiration_count": 11,
+      "timestamp": "2026-04-14T22:43:30.035178+00:00",
+      "timestamp_ms": 1776206610035
+    }
   }
 }
 ```
 
-<Info>
-The exact structure may include additional fields (puts/calls breakdown,
-notional values, etc.). Treat undocumented fields as stable but unversioned —
-we won't remove them without notice, but new fields may be added.
-</Info>
+### Per-expiration field guide
+
+Each entry in `exchanges.*` and `total` contains the same metric set:
+
+| Field | Meaning |
+|---|---|
+| `oi_usd` | Total open interest, USD notional |
+| `call_oi_usd` | Open interest contributed by call options, USD |
+| `put_oi_usd` | Open interest contributed by put options, USD |
+| `contracts` | Number of option contracts (not USD) |
+| `total_gex` | Net dealer gamma exposure (calls – puts), USD per 1% move |
+| `abs_gex` | Absolute GEX magnitude — `|call_gex|+|put_gex|` |
+| `upside_gex` | GEX concentrated above spot |
+| `downside_gex` | GEX concentrated below spot |
+
+`total` holds the aggregate across all exchanges included in the response.
+When querying a single exchange (e.g. `deribit`), `exchanges.deribit` and
+`total` are identical.
 
 ## Errors
 
@@ -80,8 +117,14 @@ resp = requests.get(
     headers={"X-API-Key": "gex_sk_your_key_here"},
 )
 data = resp.json()["data"]
-for exp in data.get("expirations", []):
-    print(f"{exp['date']}: GEX={exp.get('total_gex'):,} OI={exp.get('total_oi'):,}")
+
+for exp in data["expirations"]:
+    t = exp["total"]
+    print(
+        f"{exp['date']} (d={exp['days_to_expiry']:>3}): "
+        f"OI=${t['oi_usd']:>14,.0f}  "
+        f"net GEX={t['total_gex']:+14,.0f}"
+    )
 ```
 
 ```javascript Node.js
@@ -90,8 +133,13 @@ const resp = await fetch(
   { headers: { "X-API-Key": "gex_sk_your_key_here" } }
 );
 const { data } = await resp.json();
-for (const exp of data.expirations || []) {
-  console.log(`${exp.date}: GEX=${exp.total_gex} OI=${exp.total_oi}`);
+
+for (const exp of data.expirations) {
+  const t = exp.total;
+  console.log(
+    `${exp.date} (d=${exp.days_to_expiry}): ` +
+    `OI=$${t.oi_usd.toFixed(0)}, net GEX=${t.total_gex.toFixed(0)}`
+  );
 }
 ```
 
@@ -104,15 +152,39 @@ for (const exp of data.expirations || []) {
   "data": {
     "expirations": [
       {
-        "date": "25APR26",
-        "total_gex": 142857000,
-        "total_oi": 12543,
-        "by_exchange": {
-          "bybit": { "gex": 42857000, "oi": 4200 },
-          "deribit": { "gex": 100000000, "oi": 8343 }
+        "date": "15APR26",
+        "days_to_expiry": 0,
+        "timestamp": "2026-04-15T00:00:00+00:00",
+        "exchanges": {
+          "deribit": {
+            "oi_usd": 252323000,
+            "call_oi_usd": 115940056,
+            "put_oi_usd": 136382943,
+            "contracts": 104,
+            "total_gex": -2481405,
+            "abs_gex": 23314299,
+            "upside_gex": 8007918,
+            "downside_gex": 15306380
+          }
+        },
+        "total": {
+          "oi_usd": 252323000,
+          "call_oi_usd": 115940056,
+          "put_oi_usd": 136382943,
+          "contracts": 104,
+          "total_gex": -2481405,
+          "abs_gex": 23314299,
+          "upside_gex": 8007918,
+          "downside_gex": 15306380
         }
       }
-    ]
+    ],
+    "metadata": {
+      "basecoin": "BTC",
+      "exchanges_used": ["deribit"],
+      "current_price": 74037.30,
+      "expiration_count": 11
+    }
   },
   "meta": {
     "timestamp": "2026-04-14T10:00:00+00:00",

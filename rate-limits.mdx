@@ -6,18 +6,12 @@ description: 'Daily quotas, headers, and 429 handling'
 ## How quotas work
 
 Every API key has a **daily quota** that resets at **midnight UTC**. Every
-request to `/api/v1/*` (and the MCP server) counts as one.
+request to `/api/v1/*` counts as one.
 
 | Tier | Daily quota |
 |------|-------------|
 | `trial` | 50 requests/day |
 | `pro` | 500 requests/day |
-| `admin` | Unlimited |
-
-<Info>
-MCP requests count against the same quota as REST API requests. There's no
-separate MCP allowance.
-</Info>
 
 ## Rate limit headers
 

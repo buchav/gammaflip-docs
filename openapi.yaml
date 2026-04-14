@@ -158,13 +158,9 @@ paths:
                         type: object
                         properties:
                           available:
-                            type: object
-                            additionalProperties:
-                              type: boolean
-                            example:
-                              bybit: true
-                              deribit: true
-                              okx: true
+                            type: array
+                            items: { type: string }
+                            example: ["bybit", "deribit", "okx"]
                           virtual:
                             type: array
                             items: { type: string }
@@ -271,10 +267,11 @@ paths:
   /gex/by-strike-enhanced/{exchange}/{coin}/{expiration}:
     get:
       operationId: getByStrikeEnhanced
-      summary: Enhanced GEX by strike with gamma profile markers
+      summary: GEX by strike with key markers
       description: |
-        Returns GEX data broken down by strike price, enriched with gamma profile
-        markers (gamma flip, max gamma, support/resistance zones).
+        Returns GEX data broken down by strike price, plus key markers —
+        gamma flip, max pain, positive/negative walls, max-volatility and
+        max-stability price levels, spot reference, and aggregate totals.
 
         Pass `TOTAL` as `expiration` to get all expirations combined.
       tags: [Data]

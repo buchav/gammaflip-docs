@@ -6,10 +6,8 @@ description: 'Returns available exchanges and virtual aggregators'
 
 ## Response
 
-<ResponseField name="data.available" type="object">
-  Map of exchange name to boolean availability. Exchanges currently return
-  `true` if their cache is initialized, `false` otherwise.
-
+<ResponseField name="data.available" type="array">
+  List of exchange names whose caches are currently online and queryable.
   Currently supported: `bybit`, `deribit`, `okx`.
 </ResponseField>
 
@@ -57,11 +55,7 @@ console.log(await resp.json());
 ```json 200 OK
 {
   "data": {
-    "available": {
-      "bybit": true,
-      "deribit": true,
-      "okx": true
-    },
+    "available": ["bybit", "deribit", "okx"],
     "virtual": ["all"]
   },
   "meta": {

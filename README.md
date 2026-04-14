@@ -1,15 +1,14 @@
 # GammaFlip API Documentation
 
-Public documentation for the [GammaFlip](https://gammaflip.io) REST API and MCP server.
+Public documentation for the [GammaFlip](https://gammaflip.io) REST API.
 
 Hosted at **[docs.gammaflip.io](https://docs.gammaflip.io)** via [Mintlify](https://mintlify.com).
 
 ## Structure
 
 - `openapi.yaml` — OpenAPI 3.1 spec for all `/api/v1/` endpoints
-- `mint.json` — Mintlify navigation config
+- `docs.json` — Mintlify navigation config
 - `introduction.mdx`, `quickstart.mdx`, `authentication.mdx`, `rate-limits.mdx`, `errors.mdx` — core guides
-- `mcp-guide.mdx` — Model Context Protocol integration guide
 - `api-reference/` — per-endpoint reference pages
 
 ## Contributing

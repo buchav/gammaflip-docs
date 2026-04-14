@@ -1,17 +1,18 @@
 ---
 title: 'GEX by Strike (Enhanced)'
 api: 'GET /gex/by-strike-enhanced/{exchange}/{coin}/{expiration}'
-description: 'GEX data by strike price with gamma profile markers and key zones'
+description: 'GEX data by strike price with key markers (gamma flip, max pain, walls) and aggregate totals'
 ---
 
 ## What it returns
 
 For a specific expiration, this endpoint returns:
 
-- **GEX per strike** — dealer gamma exposure at each strike price
-- **Gamma profile curve** — total gamma exposure modeled across all price levels (not just listed strikes)
-- **Key markers** — gamma flip, max gamma strike, major walls
-- **Zones** — price regions where dealer hedging is expected to accelerate (volatility triggers)
+- **GEX per strike** — call, put, net, and total dealer gamma exposure at each listed strike
+- **Key markers** — gamma flip point, max pain, largest positive/negative GEX strikes (walls),
+  max-volatility and max-stability price levels, spot reference, and aggregate totals
+- **Asymmetry metrics** — upside vs. downside GEX imbalance and bias direction
+- **Metadata** — current price, strike range, timestamp, exchange/coin/expiration
 
 This is the most detailed GEX endpoint — it's what powers the "GEX by Strike"
 chart on [gammaflip.io](https://gammaflip.io).
@@ -36,26 +37,66 @@ chart on [gammaflip.io](https://gammaflip.io).
 ```json
 {
   "data": {
-    "strikes": [
-      { "strike": 70000, "gex": 12345, "calls_gex": ..., "puts_gex": ... }
-    ],
-    "gamma_profile": [
-      { "price": 70000, "gamma": 0.042 }
-    ],
-    "markers": {
-      "gamma_flip": 71500,
-      "max_gamma": 72000,
-      "current_price": 71800
+    "gex_data": {
+      "strikes":   [64000, 65000, 66000, ...],
+      "call_gex":  [0, 0, 0, ...],
+      "put_gex":   [0, 0, 0, ...],
+      "net_gex":   [0, 0, 0, ...],
+      "total_gex": [0, 0, 0, ...]
     },
-    "zones": [ { "type": "volatility_trigger", "price": 73000 } ],
+    "markers": {
+      "flip_points":   [{ "label": "F", "strike": 74359.02, "value": 0, "source": "gamma_profile" }],
+      "max_pain":      { "label": "MP", "strike": 73500, "value": 5009961.93 },
+      "absolute_max":  [{ "label": "A1", "strike": 73500, "value": 5009961.93 }, ...],
+      "positive_max":  [{ "label": "P1", "strike": 75000, "value": 2438676.77 }, ...],
+      "negative_max":  [{ "label": "N1", "strike": 73500, "value": -4385894.65 }, ...],
+      "spot":          { "strike": 74032.81, "value": 0 },
+      "stability_point":  { "label": "Max Stability",  "price": 76000, "gex": 9738048.19 },
+      "volatility_point": { "label": "Max Volatility", "price": 73000, "gex": -6025085.01 },
+      "totals": {
+        "call_gex": 10647784.38,
+        "put_gex": 13321643.60,
+        "net_gex": -2673859.22,
+        "absolute_gex": 23969427.97,
+        "absolute_gex_power": 0.444
+      },
+      "asymmetry": {
+        "upside_gex": 8354828.92,
+        "downside_gex": 15614599.06,
+        "asymmetry_ratio": -0.303,
+        "bias": "bullish",
+        "upside_distance": 1075.95,
+        "downside_distance": 872.48
+      }
+    },
     "metadata": {
       "basecoin": "BTC",
-      "expiration": "25APR26",
-      "exchange": "all"
+      "exchange": "deribit",
+      "expiration_date": "15APR26",
+      "current_price": 74032.81,
+      "data_points": 26,
+      "strike_range": { "min": 64000, "max": 82000 },
+      "enhanced": true,
+      "gamma_profile_source": true,
+      "timestamp": "2026-04-14T22:42:25.330317Z",
+      "timestamp_ms": 1776202945330
     }
   }
 }
 ```
+
+### Field guide
+
+- **`gex_data`** — parallel arrays; index `i` across all arrays refers to the same strike.
+  `total_gex` = `call_gex - put_gex` aggregated on dealers' side.
+- **`flip_points`** — price level(s) where net dealer GEX crosses zero. Above the flip,
+  dealer hedging is positive-gamma (stabilising); below, it's negative-gamma (amplifying).
+- **`absolute_max` / `positive_max` / `negative_max`** — ranked lists of the largest absolute,
+  positive, and negative GEX strikes. These are the "walls" where hedging flows concentrate.
+- **`stability_point`** — strike with the highest positive net GEX (strongest pinning effect).
+- **`volatility_point`** — strike with the most negative net GEX (biggest move-amplifier).
+- **`asymmetry`** — imbalance between upside and downside dealer exposure; `bias` is
+  a qualitative read (`bullish` / `bearish` / `neutral`).
 
 <Info>
 `TOTAL` aggregates all expirations for the given coin. Useful for getting an
@@ -90,19 +131,26 @@ resp = requests.get(
 )
 data = resp.json()["data"]
 
-markers = data.get("markers", {})
-print(f"Gamma flip:    {markers.get('gamma_flip'):,}")
-print(f"Max gamma:     {markers.get('max_gamma'):,}")
-print(f"Current price: {markers.get('current_price'):,}")
+markers = data["markers"]
+meta = data["metadata"]
+
+print(f"Spot:          {meta['current_price']:,.2f}")
+if markers["flip_points"]:
+    print(f"Gamma flip:    {markers['flip_points'][0]['strike']:,.2f}")
+print(f"Max volatility:{markers['volatility_point']['price']:,.2f}")
+print(f"Max stability: {markers['stability_point']['price']:,.2f}")
+print(f"Net GEX:       {markers['totals']['net_gex']:+,.0f}")
+print(f"Bias:          {markers['asymmetry']['bias']}")
 
 # Top 5 strikes by absolute GEX
-strikes = sorted(
-    data.get("strikes", []),
-    key=lambda s: abs(s.get("gex", 0)),
+gex = data["gex_data"]
+rows = sorted(
+    zip(gex["strikes"], gex["net_gex"]),
+    key=lambda r: abs(r[1]),
     reverse=True,
 )
-for s in strikes[:5]:
-    print(f"Strike {s['strike']:,}: GEX = {s['gex']:+,}")
+for strike, net in rows[:5]:
+    print(f"Strike {strike:>8,.0f}: net GEX = {net:+,.0f}")
 ```
 
 ```javascript Node.js
@@ -112,8 +160,10 @@ const resp = await fetch(url, {
 });
 const { data } = await resp.json();
 
-console.log("Markers:", data.markers);
-console.log(`Strikes returned: ${data.strikes?.length ?? 0}`);
+console.log("Spot:", data.metadata.current_price);
+console.log("Flip:", data.markers.flip_points[0]?.strike);
+console.log("Totals:", data.markers.totals);
+console.log("Strikes returned:", data.gex_data.strikes.length);
 ```
 
 </RequestExample>
@@ -123,14 +173,24 @@ console.log(`Strikes returned: ${data.strikes?.length ?? 0}`);
 ```json 200 OK
 {
   "data": {
-    "strikes": [
-      { "strike": 70000, "gex": -12_500_000, "calls_gex": 4_000_000, "puts_gex": -16_500_000 },
-      { "strike": 72000, "gex": 45_000_000,  "calls_gex": 50_000_000, "puts_gex": -5_000_000 }
-    ],
+    "gex_data": {
+      "strikes":   [70000, 72000],
+      "call_gex":  [4000000, 50000000],
+      "put_gex":   [16500000, 5000000],
+      "net_gex":   [-12500000, 45000000],
+      "total_gex": [-12500000, 45000000]
+    },
     "markers": {
-      "gamma_flip": 71500,
-      "max_gamma": 72000,
-      "current_price": 71800
+      "flip_points": [{ "label": "F", "strike": 71500, "value": 0, "source": "gamma_profile" }],
+      "max_pain":    { "label": "MP", "strike": 72000, "value": 50000000 },
+      "totals": { "net_gex": 32500000, "call_gex": 54000000, "put_gex": 21500000, "absolute_gex": 75500000, "absolute_gex_power": 0.7 }
+    },
+    "metadata": {
+      "basecoin": "BTC",
+      "exchange": "all",
+      "expiration_date": "25APR26",
+      "current_price": 71800,
+      "timestamp": "2026-04-14T10:00:00Z"
     }
   },
   "meta": {
