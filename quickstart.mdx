@@ -1,0 +1,130 @@
+---
+title: 'Quickstart'
+description: 'From zero to your first GEX request in 5 minutes'
+---
+
+## 1. Get a subscription
+
+Sign up at [gammaflip.io](https://gammaflip.io). You get a 14-day trial with
+API access included (50 requests/day). To unlock 500 requests/day and up to
+5 keys, [upgrade to Pro](https://gammaflip.io/subscribe?plan=pro).
+
+## 2. Create an API key
+
+1. Log in at [gammaflip.io/account](https://gammaflip.io/account)
+2. Open the menu → **API Keys**
+3. Click **Create API Key**, give it a description
+4. Copy the key — it's shown only once
+
+<Warning>
+Your API key starts with `gex_sk_` and is shown **only once** at creation.
+Save it somewhere secure (password manager, env var). If you lose it, you'll
+need to create a new one.
+</Warning>
+
+## 3. Make your first request
+
+List available exchanges:
+
+<CodeGroup>
+
+```bash cURL
+curl https://api.gammaflip.io/api/v1/exchanges \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+```python Python
+import requests
+
+resp = requests.get(
+    "https://api.gammaflip.io/api/v1/exchanges",
+    headers={"X-API-Key": "gex_sk_your_key_here"},
+)
+print(resp.json())
+```
+
+```javascript Node.js
+const resp = await fetch("https://api.gammaflip.io/api/v1/exchanges", {
+  headers: { "X-API-Key": "gex_sk_your_key_here" },
+});
+console.log(await resp.json());
+```
+
+</CodeGroup>
+
+Expected response:
+
+```json
+{
+  "data": {
+    "available": { "bybit": true, "deribit": true, "okx": true },
+    "virtual": ["all"]
+  },
+  "meta": {
+    "timestamp": "2026-04-14T10:00:00+00:00",
+    "rate_limit": {
+      "limit": 500,
+      "remaining": 499,
+      "reset": "2026-04-15T00:00:00+00:00"
+    }
+  }
+}
+```
+
+## 4. Get real GEX data
+
+Fetch the GEX term structure for Bitcoin across all exchanges:
+
+<CodeGroup>
+
+```bash cURL
+curl https://api.gammaflip.io/api/v1/gex/term-oi/all/BTC \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+```python Python
+resp = requests.get(
+    "https://api.gammaflip.io/api/v1/gex/term-oi/all/BTC",
+    headers={"X-API-Key": "gex_sk_your_key_here"},
+)
+data = resp.json()["data"]
+for exp in data["expirations"]:
+    print(exp["date"], exp["total_gex"], exp["total_oi"])
+```
+
+</CodeGroup>
+
+## 5. Check your rate limit
+
+Every response includes these headers:
+
+```
+X-RateLimit-Limit: 500
+X-RateLimit-Remaining: 498
+X-RateLimit-Reset: 2026-04-15T00:00:00+00:00
+```
+
+When you hit the limit, you'll get `429 Too Many Requests`. Quota resets at
+**midnight UTC** every day.
+
+<Tip>
+The underlying GEX data updates every 15 minutes (from our Lambda capture).
+Polling more frequently than that doesn't yield new data.
+</Tip>
+
+## What's next?
+
+<CardGroup cols={2}>
+  <Card title="MCP Integration" icon="robot" href="/mcp-guide">
+    Connect Claude Desktop to query GEX data in natural language.
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference/exchanges">
+    Full reference for all endpoints, parameters, and response schemas.
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Learn about tiers, key management, and security best practices.
+  </Card>
+  <Card title="Rate Limits" icon="gauge" href="/rate-limits">
+    How quotas work and how to handle 429 responses gracefully.
+  </Card>
+</CardGroup>

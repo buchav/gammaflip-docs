@@ -1,0 +1,157 @@
+---
+title: 'GEX by Strike (Enhanced)'
+api: 'GET /gex/by-strike-enhanced/{exchange}/{coin}/{expiration}'
+description: 'GEX data by strike price with gamma profile markers and key zones'
+---
+
+## What it returns
+
+For a specific expiration, this endpoint returns:
+
+- **GEX per strike** — dealer gamma exposure at each strike price
+- **Gamma profile curve** — total gamma exposure modeled across all price levels (not just listed strikes)
+- **Key markers** — gamma flip, max gamma strike, major walls
+- **Zones** — price regions where dealer hedging is expected to accelerate (volatility triggers)
+
+This is the most detailed GEX endpoint — it's what powers the "GEX by Strike"
+chart on [gammaflip.io](https://gammaflip.io).
+
+## Path parameters
+
+<ParamField path="exchange" type="string" required>
+  Exchange name: `bybit`, `deribit`, `okx`, or `all`.
+</ParamField>
+
+<ParamField path="coin" type="string" required>
+  Base coin symbol (uppercase).
+</ParamField>
+
+<ParamField path="expiration" type="string" required>
+  Expiration date in `DDMMMYY` format (e.g., `25APR26`), or `TOTAL` to combine
+  all expirations into a single view.
+</ParamField>
+
+## Response shape
+
+```json
+{
+  "data": {
+    "strikes": [
+      { "strike": 70000, "gex": 12345, "calls_gex": ..., "puts_gex": ... }
+    ],
+    "gamma_profile": [
+      { "price": 70000, "gamma": 0.042 }
+    ],
+    "markers": {
+      "gamma_flip": 71500,
+      "max_gamma": 72000,
+      "current_price": 71800
+    },
+    "zones": [ { "type": "volatility_trigger", "price": 73000 } ],
+    "metadata": {
+      "basecoin": "BTC",
+      "expiration": "25APR26",
+      "exchange": "all"
+    }
+  }
+}
+```
+
+<Info>
+`TOTAL` aggregates all expirations for the given coin. Useful for getting an
+"all-positioning" view; individual expiration views are more precise for
+timing-specific trades.
+</Info>
+
+## Errors
+
+<ResponseField name="400 invalid_exchange" type="error">
+  Exchange not recognized.
+</ResponseField>
+
+<ResponseField name="404 no_data" type="error">
+  No data for this coin/exchange/expiration combination. Common cause: the
+  expiration doesn't exist on that exchange (use `/expirations/` first).
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl "https://api.gammaflip.io/api/v1/gex/by-strike-enhanced/all/BTC/25APR26" \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+```python Python
+import requests
+
+resp = requests.get(
+    "https://api.gammaflip.io/api/v1/gex/by-strike-enhanced/all/BTC/25APR26",
+    headers={"X-API-Key": "gex_sk_your_key_here"},
+)
+data = resp.json()["data"]
+
+markers = data.get("markers", {})
+print(f"Gamma flip:    {markers.get('gamma_flip'):,}")
+print(f"Max gamma:     {markers.get('max_gamma'):,}")
+print(f"Current price: {markers.get('current_price'):,}")
+
+# Top 5 strikes by absolute GEX
+strikes = sorted(
+    data.get("strikes", []),
+    key=lambda s: abs(s.get("gex", 0)),
+    reverse=True,
+)
+for s in strikes[:5]:
+    print(f"Strike {s['strike']:,}: GEX = {s['gex']:+,}")
+```
+
+```javascript Node.js
+const url = "https://api.gammaflip.io/api/v1/gex/by-strike-enhanced/all/BTC/25APR26";
+const resp = await fetch(url, {
+  headers: { "X-API-Key": "gex_sk_your_key_here" },
+});
+const { data } = await resp.json();
+
+console.log("Markers:", data.markers);
+console.log(`Strikes returned: ${data.strikes?.length ?? 0}`);
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "data": {
+    "strikes": [
+      { "strike": 70000, "gex": -12_500_000, "calls_gex": 4_000_000, "puts_gex": -16_500_000 },
+      { "strike": 72000, "gex": 45_000_000,  "calls_gex": 50_000_000, "puts_gex": -5_000_000 }
+    ],
+    "markers": {
+      "gamma_flip": 71500,
+      "max_gamma": 72000,
+      "current_price": 71800
+    }
+  },
+  "meta": {
+    "timestamp": "2026-04-14T10:00:00+00:00",
+    "exchange": "all",
+    "coin": "BTC",
+    "expiration": "25APR26",
+    "rate_limit": {
+      "limit": 500,
+      "remaining": 492,
+      "reset": "2026-04-15T00:00:00+00:00"
+    }
+  }
+}
+```
+
+```json 404 Not Found
+{
+  "error": "no_data",
+  "message": "No data available for BTC."
+}
+```
+
+</ResponseExample>

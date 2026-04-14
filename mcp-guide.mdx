@@ -1,0 +1,170 @@
+---
+title: 'MCP Server Guide'
+description: 'Connect Claude Desktop and AI agents to GEX data'
+---
+
+## What is MCP?
+
+[MCP (Model Context Protocol)](https://modelcontextprotocol.io) is an open
+protocol that lets AI assistants call external tools. Our MCP server exposes
+GEX data as tools that Claude Desktop (and other MCP clients) can use directly
+— no code required.
+
+## Setup in Claude Desktop
+
+### 1. Open your MCP config
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json`
+(macOS) or the equivalent on your platform.
+
+### 2. Add the GammaFlip server
+
+```json
+{
+  "mcpServers": {
+    "gammaflip": {
+      "url": "https://api.gammaflip.io/mcp/tools/call",
+      "info_url": "https://api.gammaflip.io/mcp/info",
+      "headers": {
+        "X-API-Key": "gex_sk_your_key_here"
+      }
+    }
+  }
+}
+```
+
+### 3. Restart Claude Desktop
+
+Close Claude Desktop fully and reopen. You should see **5 new tools** available
+to the assistant:
+
+- `list_exchanges`
+- `list_coins`
+- `list_expirations`
+- `get_gex_term_oi`
+- `get_gex_by_strike`
+
+## Example prompts
+
+Once connected, you can ask Claude things like:
+
+<AccordionGroup>
+
+<Accordion title="Term structure analysis">
+> "Show me the BTC GEX term structure across all exchanges. Which expiration
+> has the highest gamma concentration?"
+
+Claude will call `get_gex_term_oi(exchange="all", coin="BTC")` and analyze
+the response.
+</Accordion>
+
+<Accordion title="Key levels for an expiration">
+> "What are the key gamma levels for BTC expiring next Friday? Focus on
+> support, resistance, and the gamma flip."
+
+Claude will call `list_expirations` to find the right date, then
+`get_gex_by_strike` for that expiration, and identify the key zones.
+</Accordion>
+
+<Accordion title="Compare across exchanges">
+> "Compare the ETH gamma profile between Deribit and Bybit for the upcoming
+> weekly expiration. Where do they agree, where do they diverge?"
+
+Claude will pull data from each exchange separately and synthesize the comparison.
+</Accordion>
+
+<Accordion title="Pre-trade checklist">
+> "I'm thinking about a BTC breakout trade above 75k. Check the GEX structure
+> — is dealer positioning supportive or does it suggest heavy resistance?"
+
+Claude pulls the relevant data and gives you a qualitative read on whether
+gamma will amplify or dampen the move.
+</Accordion>
+
+</AccordionGroup>
+
+## Available tools
+
+### `list_exchanges`
+
+Lists all available exchanges.
+
+**Inputs:** none
+**Returns:** `{ available: { bybit: true, deribit: true, ... }, virtual: ["all"] }`
+
+### `list_coins`
+
+Lists all supported base coins across exchanges.
+
+**Inputs:** none
+**Returns:** `{ coins: ["BTC", "ETH", "SOL", ...] }`
+
+### `list_expirations`
+
+Lists available option expiration dates.
+
+**Inputs:**
+- `exchange` (string): `bybit`, `deribit`, `okx`, or `all`
+- `coin` (string): `BTC`, `ETH`, etc.
+
+**Returns:** `{ expirations: ["25APR26", "02MAY26", ...], exchange, coin }`
+
+### `get_gex_term_oi`
+
+GEX and Open Interest per expiration, broken down by exchange.
+
+**Inputs:**
+- `exchange` (string)
+- `coin` (string)
+
+**Returns:** Full term structure with OI and GEX per expiration.
+
+### `get_gex_by_strike`
+
+Enhanced GEX data by strike price with gamma profile markers.
+
+**Inputs:**
+- `exchange` (string)
+- `coin` (string)
+- `expiration` (string): `DDMMMYY` format (e.g., `25APR26`) or `TOTAL`
+
+**Returns:** GEX by strike, gamma profile curve, key levels (flip, max gamma, zones).
+
+## Rate limits
+
+MCP requests count against the same daily quota as REST API calls:
+- **Trial**: 50 req/day
+- **Pro**: 500 req/day
+
+See [Rate Limits](/rate-limits) for details.
+
+## Troubleshooting
+
+<AccordionGroup>
+
+<Accordion title="Claude doesn't see the tools">
+1. Check the config file path is correct for your OS
+2. Verify the JSON is valid (run it through a validator)
+3. Fully quit Claude Desktop and reopen — reloading from within the app
+   doesn't always pick up MCP changes
+4. Check the Claude Desktop logs for connection errors
+</Accordion>
+
+<Accordion title="All tool calls return 401">
+Your API key is wrong or revoked. Create a new one at
+[gammaflip.io/account](https://gammaflip.io/account) and update the config.
+</Accordion>
+
+<Accordion title="Tool calls work but say 'rate_limit_exceeded'">
+You've hit your daily quota. Wait for reset at midnight UTC, or
+[upgrade to Pro](https://gammaflip.io/subscribe?plan=pro) for 500 req/day.
+</Accordion>
+
+<Accordion title="Getting 'No data available' errors">
+Check that:
+- The coin is supported (use `list_coins` first)
+- The expiration hasn't already expired (use `list_expirations`)
+- The exchange actually lists that coin (e.g., OKX doesn't have XRP options)
+</Accordion>
+
+</AccordionGroup>

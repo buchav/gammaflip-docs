@@ -1,0 +1,90 @@
+---
+title: 'Errors'
+description: 'Error codes and how to handle them'
+---
+
+## Error format
+
+All errors return a JSON body with `error` and `message`:
+
+```json
+{
+  "error": "rate_limit_exceeded",
+  "message": "Daily limit of 500 reached."
+}
+```
+
+## HTTP status codes
+
+| Code | Meaning | Common causes |
+|------|---------|---------------|
+| `200` | OK | — |
+| `400` | Bad Request | Invalid exchange name, malformed parameters |
+| `401` | Unauthorized | Missing or invalid API key |
+| `403` | Forbidden | Subscription doesn't allow API access |
+| `404` | Not Found | No data available for this coin/exchange/expiration |
+| `429` | Too Many Requests | Daily quota exceeded — see [rate limits](/rate-limits) |
+| `500` | Server Error | Something went wrong on our side — retry or contact support |
+
+## Error codes
+
+### `unauthorized` (401)
+
+```json
+{ "error": "unauthorized", "message": "Invalid or missing API key." }
+```
+
+Check that:
+- The `X-API-Key` header is present
+- The key is correct (no copy-paste whitespace)
+- The key hasn't been revoked
+- The key starts with `gex_sk_`
+
+### `subscription_required` (403)
+
+```json
+{
+  "error": "subscription_required",
+  "message": "API access requires Pro subscription or active trial.",
+  "current_tier": "premium"
+}
+```
+
+Your subscription doesn't include API access. The `current_tier` field shows
+your current plan. [Upgrade to Pro](https://gammaflip.io/subscribe?plan=pro)
+to get API access.
+
+### `invalid_exchange` (400)
+
+```json
+{
+  "error": "invalid_exchange",
+  "message": "Exchange \"foo\" is not available."
+}
+```
+
+Valid values: `bybit`, `deribit`, `okx`, `all` (aggregated).
+
+### `no_data` (404)
+
+```json
+{ "error": "no_data", "message": "No data available for XYZ." }
+```
+
+The combination of coin/exchange/expiration doesn't exist. Common causes:
+- The exchange doesn't list options for this coin (e.g., OKX doesn't have XRP)
+- The expiration has already expired
+- The basecoin is mistyped (must be uppercase)
+
+### `rate_limit_exceeded` (429)
+
+```json
+{ "error": "rate_limit_exceeded", "message": "Daily limit of 500 reached." }
+```
+
+See [Rate Limits](/rate-limits) for handling strategies.
+
+## Getting help
+
+- **Bug reports / unclear errors**: [admin@gammaflip.io](mailto:admin@gammaflip.io)
+- **Feature requests**: open an issue on [gammaflip-docs](https://github.com/buchav/gammaflip-docs/issues)

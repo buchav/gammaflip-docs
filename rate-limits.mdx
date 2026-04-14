@@ -1,0 +1,140 @@
+---
+title: 'Rate Limits'
+description: 'Daily quotas, headers, and 429 handling'
+---
+
+## How quotas work
+
+Every API key has a **daily quota** that resets at **midnight UTC**. Every
+request to `/api/v1/*` (and the MCP server) counts as one.
+
+| Tier | Daily quota |
+|------|-------------|
+| `trial` | 50 requests/day |
+| `pro` | 500 requests/day |
+| `admin` | Unlimited |
+
+<Info>
+MCP requests count against the same quota as REST API requests. There's no
+separate MCP allowance.
+</Info>
+
+## Rate limit headers
+
+Every response includes three headers:
+
+```
+X-RateLimit-Limit: 500
+X-RateLimit-Remaining: 487
+X-RateLimit-Reset: 2026-04-15T00:00:00+00:00
+```
+
+| Header | Meaning |
+|--------|---------|
+| `X-RateLimit-Limit` | Your daily quota |
+| `X-RateLimit-Remaining` | Requests left until reset |
+| `X-RateLimit-Reset` | When the counter resets (ISO 8601, UTC) |
+
+The `rate_limit` field in the response body contains the same information:
+
+```json
+{
+  "data": { "..." },
+  "meta": {
+    "rate_limit": {
+      "limit": 500,
+      "remaining": 487,
+      "reset": "2026-04-15T00:00:00+00:00"
+    }
+  }
+}
+```
+
+## Handling 429 responses
+
+When you exceed your quota:
+
+```http
+HTTP/1.1 429 Too Many Requests
+X-RateLimit-Limit: 500
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 2026-04-15T00:00:00+00:00
+Content-Type: application/json
+
+{
+  "error": "rate_limit_exceeded",
+  "message": "Daily limit of 500 reached."
+}
+```
+
+### Recommended handling
+
+<CodeGroup>
+
+```python Python
+import time
+from datetime import datetime, timezone
+
+def call_with_retry(fn, max_retries=3):
+    for attempt in range(max_retries):
+        resp = fn()
+        if resp.status_code != 429:
+            return resp
+
+        reset = resp.headers.get("X-RateLimit-Reset")
+        if not reset:
+            time.sleep(60)
+            continue
+
+        reset_ts = datetime.fromisoformat(reset).timestamp()
+        wait = max(0, reset_ts - time.time())
+
+        # Don't wait more than an hour — surface the error instead
+        if wait > 3600:
+            raise RuntimeError(f"Rate limited until {reset}")
+
+        time.sleep(wait + 1)
+    raise RuntimeError("Max retries exceeded")
+```
+
+```javascript Node.js
+async function callWithRetry(fn, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    const resp = await fn();
+    if (resp.status !== 429) return resp;
+
+    const reset = resp.headers.get("X-RateLimit-Reset");
+    if (!reset) {
+      await new Promise(r => setTimeout(r, 60_000));
+      continue;
+    }
+
+    const waitMs = new Date(reset).getTime() - Date.now() + 1000;
+    if (waitMs > 3_600_000) {
+      throw new Error(`Rate limited until ${reset}`);
+    }
+    await new Promise(r => setTimeout(r, Math.max(0, waitMs)));
+  }
+  throw new Error("Max retries exceeded");
+}
+```
+
+</CodeGroup>
+
+## Planning your quota
+
+The underlying GEX data updates every **15 minutes** (Lambda capture). Polling
+more often than that doesn't yield new data. A typical trading bot pattern:
+
+- `term-oi` for BTC + ETH every 15 min = 2 × 4 = **8 req/hour**
+- `by-strike-enhanced` for 2-3 expirations every 15 min = ~10 req/hour
+- Discovery endpoints (rare, cached locally) = **1-2 req/day**
+
+**Total: ~430 req/day for a busy bot** — comfortably within the 500/day Pro quota.
+
+## Running out of quota?
+
+- **Cache responses locally.** The data only changes every 15 min.
+- **Use the virtual `all` exchange** instead of calling each exchange separately.
+- **Reduce polling frequency** to once every 30 min if you don't need sub-15-min latency.
+- **Contact us** at [admin@gammaflip.io](mailto:admin@gammaflip.io) if you need a higher custom limit.

@@ -1,0 +1,78 @@
+---
+title: 'List Exchanges'
+api: 'GET /exchanges'
+description: 'Returns available exchanges and virtual aggregators'
+---
+
+## Response
+
+<ResponseField name="data.available" type="object">
+  Map of exchange name to boolean availability. Exchanges currently return
+  `true` if their cache is initialized, `false` otherwise.
+
+  Currently supported: `bybit`, `deribit`, `okx`.
+</ResponseField>
+
+<ResponseField name="data.virtual" type="array">
+  List of virtual exchanges. Currently just `["all"]` — a cross-exchange
+  aggregator that combines data from every available exchange.
+</ResponseField>
+
+<ResponseField name="meta.timestamp" type="string">
+  ISO 8601 timestamp of when the response was generated.
+</ResponseField>
+
+<ResponseField name="meta.rate_limit" type="object">
+  Your current rate limit status — `limit`, `remaining`, `reset`.
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.gammaflip.io/api/v1/exchanges \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+```python Python
+import requests
+
+resp = requests.get(
+    "https://api.gammaflip.io/api/v1/exchanges",
+    headers={"X-API-Key": "gex_sk_your_key_here"},
+)
+print(resp.json())
+```
+
+```javascript Node.js
+const resp = await fetch("https://api.gammaflip.io/api/v1/exchanges", {
+  headers: { "X-API-Key": "gex_sk_your_key_here" },
+});
+console.log(await resp.json());
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "data": {
+    "available": {
+      "bybit": true,
+      "deribit": true,
+      "okx": true
+    },
+    "virtual": ["all"]
+  },
+  "meta": {
+    "timestamp": "2026-04-14T10:00:00+00:00",
+    "rate_limit": {
+      "limit": 500,
+      "remaining": 499,
+      "reset": "2026-04-15T00:00:00+00:00"
+    }
+  }
+}
+```
+
+</ResponseExample>

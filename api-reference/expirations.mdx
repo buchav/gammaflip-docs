@@ -1,0 +1,93 @@
+---
+title: 'List Expirations'
+api: 'GET /expirations/{exchange}/{coin}'
+description: 'Returns sorted, non-expired option expiration dates'
+---
+
+## Path parameters
+
+<ParamField path="exchange" type="string" required>
+  Exchange name: `bybit`, `deribit`, `okx`, or `all` (cross-exchange union).
+</ParamField>
+
+<ParamField path="coin" type="string" required>
+  Base coin symbol (uppercase). Use `/coins` to see what's available.
+</ParamField>
+
+## Response
+
+<ResponseField name="data.expirations" type="array">
+  Array of expiration date strings in `DDMMMYY` format (e.g., `25APR26`),
+  sorted chronologically. Already-expired dates are filtered out (expiration
+  is 08:00 UTC with a 1-hour grace period).
+</ResponseField>
+
+<ResponseField name="meta.exchange" type="string">
+  The exchange you queried (echoed back).
+</ResponseField>
+
+<ResponseField name="meta.coin" type="string">
+  The coin you queried (echoed back).
+</ResponseField>
+
+## Errors
+
+<ResponseField name="400 invalid_exchange" type="error">
+  Exchange name isn't recognized. Use `/exchanges` to list valid values.
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.gammaflip.io/api/v1/expirations/all/BTC \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+```python Python
+import requests
+
+resp = requests.get(
+    "https://api.gammaflip.io/api/v1/expirations/all/BTC",
+    headers={"X-API-Key": "gex_sk_your_key_here"},
+)
+for exp in resp.json()["data"]["expirations"]:
+    print(exp)
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "data": {
+    "expirations": [
+      "18APR26",
+      "25APR26",
+      "02MAY26",
+      "09MAY26",
+      "27JUN26",
+      "26SEP26"
+    ]
+  },
+  "meta": {
+    "timestamp": "2026-04-14T10:00:00+00:00",
+    "exchange": "all",
+    "coin": "BTC",
+    "rate_limit": {
+      "limit": 500,
+      "remaining": 497,
+      "reset": "2026-04-15T00:00:00+00:00"
+    }
+  }
+}
+```
+
+```json 400 Bad Request
+{
+  "error": "invalid_exchange",
+  "message": "Exchange \"kraken\" is not available."
+}
+```
+
+</ResponseExample>

@@ -1,0 +1,73 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "GammaFlip API",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#6366f1",
+    "light": "#818cf8",
+    "dark": "#4f46e5",
+    "anchors": {
+      "from": "#6366f1",
+      "to": "#4f46e5"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "Dashboard",
+      "url": "https://gammaflip.io/app"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Get Pro",
+    "url": "https://gammaflip.io/subscribe?plan=pro"
+  },
+  "anchors": [
+    {
+      "name": "REST API",
+      "icon": "code",
+      "url": "api-reference"
+    },
+    {
+      "name": "MCP Server",
+      "icon": "robot",
+      "url": "mcp-guide"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "authentication",
+        "rate-limits",
+        "errors"
+      ]
+    },
+    {
+      "group": "MCP Integration",
+      "pages": [
+        "mcp-guide"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/exchanges",
+        "api-reference/coins",
+        "api-reference/expirations",
+        "api-reference/term-oi",
+        "api-reference/by-strike-enhanced"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "website": "https://gammaflip.io",
+    "github": "https://github.com/buchav/gammaflip-docs"
+  },
+  "openapi": "openapi.yaml"
+}

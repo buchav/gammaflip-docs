@@ -1,0 +1,54 @@
+---
+title: 'List Coins'
+api: 'GET /coins'
+description: 'Returns available base coins across all exchanges'
+---
+
+## Response
+
+<ResponseField name="data.coins" type="array">
+  Sorted list of base coin symbols (uppercase) that have options listed on at
+  least one supported exchange.
+
+  Typical values: `BTC`, `ETH`, `SOL`, `XRP`, and others that exchanges may list.
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.gammaflip.io/api/v1/coins \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+```python Python
+import requests
+
+resp = requests.get(
+    "https://api.gammaflip.io/api/v1/coins",
+    headers={"X-API-Key": "gex_sk_your_key_here"},
+)
+coins = resp.json()["data"]["coins"]
+print(f"Available coins: {', '.join(coins)}")
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "data": {
+    "coins": ["BTC", "ETH", "SOL", "XRP"]
+  },
+  "meta": {
+    "timestamp": "2026-04-14T10:00:00+00:00",
+    "rate_limit": {
+      "limit": 500,
+      "remaining": 498,
+      "reset": "2026-04-15T00:00:00+00:00"
+    }
+  }
+}
+```
+
+</ResponseExample>

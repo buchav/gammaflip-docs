@@ -1,0 +1,299 @@
+openapi: '3.1.0'
+info:
+  title: GammaFlip GEX API
+  version: '1.0.0'
+  description: |
+    Programmatic access to Gamma Exposure (GEX) data for cryptocurrency options.
+
+    Requires a **Pro subscription** (€35/month) or an active trial. Trial users
+    are limited to 50 requests/day; Pro users get 500 requests/day.
+  contact:
+    name: GammaFlip Support
+    email: admin@gammaflip.io
+    url: https://gammaflip.io
+
+servers:
+  - url: https://api.gammaflip.io/api/v1
+    description: Production
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        API key prefixed with `gex_sk_`. Create one in your
+        [account dashboard](https://gammaflip.io/account).
+
+  schemas:
+    Envelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          description: The response payload.
+        meta:
+          type: object
+          properties:
+            timestamp:
+              type: string
+              format: date-time
+              example: "2026-04-14T10:00:00+00:00"
+            exchange:
+              type: string
+              example: "all"
+            coin:
+              type: string
+              example: "BTC"
+            rate_limit:
+              $ref: '#/components/schemas/RateLimit'
+
+    RateLimit:
+      type: object
+      properties:
+        limit:
+          type: integer
+          example: 500
+        remaining:
+          type: integer
+          example: 487
+        reset:
+          type: string
+          format: date-time
+          example: "2026-04-15T00:00:00+00:00"
+
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          enum:
+            - unauthorized
+            - subscription_required
+            - rate_limit_exceeded
+            - invalid_exchange
+            - no_data
+          example: "rate_limit_exceeded"
+        message:
+          type: string
+          example: "Daily limit of 500 reached."
+        current_tier:
+          type: string
+          example: "free"
+
+paths:
+  /exchanges:
+    get:
+      operationId: listExchanges
+      summary: List available exchanges
+      description: Returns the list of supported exchanges and the virtual `all` aggregator.
+      tags: [Discovery]
+      responses:
+        '200':
+          description: Exchange list
+          headers:
+            X-RateLimit-Limit:
+              schema: { type: integer }
+            X-RateLimit-Remaining:
+              schema: { type: integer }
+            X-RateLimit-Reset:
+              schema: { type: string, format: date-time }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          available:
+                            type: object
+                            additionalProperties:
+                              type: boolean
+                            example:
+                              bybit: true
+                              deribit: true
+                              okx: true
+                          virtual:
+                            type: array
+                            items: { type: string }
+                            example: ["all"]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /coins:
+    get:
+      operationId: listCoins
+      summary: List available coins
+      description: Returns the union of base coins (BTC, ETH, SOL, XRP, etc.) across all exchanges.
+      tags: [Discovery]
+      responses:
+        '200':
+          description: Coin list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          coins:
+                            type: array
+                            items: { type: string }
+                            example: ["BTC", "ETH", "SOL", "XRP"]
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /expirations/{exchange}/{coin}:
+    get:
+      operationId: listExpirations
+      summary: List expiration dates
+      description: |
+        Returns sorted, non-expired option expiration dates for a given exchange and coin.
+
+        Pass `all` as `exchange` for aggregated data across all exchanges.
+      tags: [Discovery]
+      parameters:
+        - $ref: '#/components/parameters/Exchange'
+        - $ref: '#/components/parameters/Coin'
+      responses:
+        '200':
+          description: Expiration list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          expirations:
+                            type: array
+                            items: { type: string }
+                            example: ["25APR26", "02MAY26", "09MAY26", "27JUN26"]
+        '400':
+          description: Invalid exchange name
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /gex/term-oi/{exchange}/{coin}:
+    get:
+      operationId: getTermOi
+      summary: GEX term structure and Open Interest
+      description: |
+        Returns OI and GEX per expiration date, broken down by exchange.
+
+        Use `all` as `exchange` to get aggregated data across all exchanges.
+        This is the most common endpoint for building term-structure dashboards.
+      tags: [Data]
+      parameters:
+        - $ref: '#/components/parameters/Exchange'
+        - $ref: '#/components/parameters/Coin'
+      responses:
+        '200':
+          description: Term structure data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400': { description: Invalid exchange }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No data available for this coin/exchange }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /gex/by-strike-enhanced/{exchange}/{coin}/{expiration}:
+    get:
+      operationId: getByStrikeEnhanced
+      summary: Enhanced GEX by strike with gamma profile markers
+      description: |
+        Returns GEX data broken down by strike price, enriched with gamma profile
+        markers (gamma flip, max gamma, support/resistance zones).
+
+        Pass `TOTAL` as `expiration` to get all expirations combined.
+      tags: [Data]
+      parameters:
+        - $ref: '#/components/parameters/Exchange'
+        - $ref: '#/components/parameters/Coin'
+        - name: expiration
+          in: path
+          required: true
+          description: Expiration date in `DDMMMYY` format (e.g., `25APR26`) or `TOTAL` for all expirations.
+          schema:
+            type: string
+            example: "25APR26"
+      responses:
+        '200':
+          description: GEX by strike data
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Envelope' }
+        '400': { description: Invalid exchange }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No data available }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  parameters:
+    Exchange:
+      name: exchange
+      in: path
+      required: true
+      description: Exchange name (`bybit`, `deribit`, `okx`) or `all` for aggregated data.
+      schema:
+        type: string
+        enum: [bybit, deribit, okx, all, combined]
+        example: "all"
+    Coin:
+      name: coin
+      in: path
+      required: true
+      description: Base coin symbol (uppercase).
+      schema:
+        type: string
+        example: "BTC"
+
+  responses:
+    Unauthorized:
+      description: Invalid or missing API key
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: Subscription required
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: Daily rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema: { type: integer }
+        X-RateLimit-Remaining:
+          schema: { type: integer, example: 0 }
+        X-RateLimit-Reset:
+          schema: { type: string, format: date-time }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }

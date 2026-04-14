@@ -1,0 +1,88 @@
+---
+title: 'Authentication'
+description: 'API keys, tiers, and security'
+---
+
+## API Key format
+
+All API keys have the prefix `gex_sk_` followed by 32 URL-safe characters:
+
+```
+gex_sk_aBc123XyZ456_abcdef789ghi...
+```
+
+Keys are generated at [gammaflip.io/account](https://gammaflip.io/account) and
+shown **only once** at creation. We store a SHA256 hash — we cannot recover a
+lost key. If you lose it, revoke it and create a new one.
+
+## Sending the key
+
+Include the key in the `X-API-Key` HTTP header on every request:
+
+```http
+GET /api/v1/exchanges HTTP/1.1
+Host: api.gammaflip.io
+X-API-Key: gex_sk_your_key_here
+```
+
+<Info>
+The API also accepts `Authorization: Bearer <jwt>` for browser-based dashboard
+testing, but API keys are the recommended method for bots and scripts.
+</Info>
+
+## Tiers and quotas
+
+| Tier | Price | Daily quota | Max keys |
+|------|-------|-------------|----------|
+| `trial` | Free (14 days) | 50 req/day | 1 |
+| `pro` | €35/month | 500 req/day | 5 |
+| `admin` | — | Unlimited | Unlimited |
+
+The `premium` tier (€15/month) has **no API access** — it's dashboard-only.
+[Upgrade to Pro](https://gammaflip.io/subscribe?plan=pro) for API access.
+
+### Tier information in responses
+
+The authenticated tier isn't returned in the response body, but you can infer
+your quota from the `X-RateLimit-Limit` header.
+
+## Managing keys
+
+### Create a key
+
+1. Log in to [gammaflip.io/account](https://gammaflip.io/account)
+2. Open menu → **API Keys** → **Create API Key**
+3. Enter a description (e.g., "Production Lambda", "Local dev bot")
+4. Copy the key immediately — it won't be shown again
+
+### List your keys
+
+The UI shows only the **key prefix** (first 12 chars) — useful for identifying
+keys without exposing secrets.
+
+### Revoke a key
+
+In the API Keys modal, click the trash icon next to any key. Revocation is
+instant — any request using that key will start returning `401`.
+
+<Warning>
+Revoked keys are soft-deleted — they can't be reactivated. If you need to
+rotate a key, create a new one first, update your clients, then revoke the old one.
+</Warning>
+
+## Security best practices
+
+- **Never commit keys to git.** Use environment variables or a secrets manager.
+- **Create separate keys for each environment** (dev, staging, prod) so you can
+  rotate independently.
+- **Revoke keys that haven't been used in 90 days** (check `last_used_at` in the UI).
+- **Store keys server-side only.** Never ship keys to browsers, mobile apps, or
+  any client-side code — they'll be extracted.
+- **Rotate keys periodically**, especially after team member changes.
+
+## What if my key is compromised?
+
+1. Revoke it immediately at [gammaflip.io/account](https://gammaflip.io/account)
+2. Create a new key
+3. Update your clients
+4. If you suspect misuse, email [admin@gammaflip.io](mailto:admin@gammaflip.io)

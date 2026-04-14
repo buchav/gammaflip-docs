@@ -1,0 +1,130 @@
+---
+title: 'GEX Term Structure'
+api: 'GET /gex/term-oi/{exchange}/{coin}'
+description: 'Open Interest and Gamma Exposure per expiration, broken down by exchange'
+---
+
+## What it returns
+
+For each expiration date, this endpoint returns:
+
+- **Open Interest** (total contracts outstanding) per exchange
+- **Gamma Exposure** (total dealer gamma, in dollar terms) per exchange
+- **Aggregated totals** across all exchanges
+
+Use this to understand how gamma and OI are distributed across the term
+structure, and to spot the expirations where dealer positioning is heaviest.
+
+## Path parameters
+
+<ParamField path="exchange" type="string" required>
+  Exchange name: `bybit`, `deribit`, `okx`, or `all` (cross-exchange aggregation).
+</ParamField>
+
+<ParamField path="coin" type="string" required>
+  Base coin symbol (uppercase).
+</ParamField>
+
+## Response schema
+
+The response data follows the schema used internally by the GammaFlip dashboard.
+Shape at a glance:
+
+```json
+{
+  "data": {
+    "expirations": [
+      {
+        "date": "25APR26",
+        "total_gex": 1234567890,
+        "total_oi": 45678,
+        "by_exchange": {
+          "bybit": { "gex": ..., "oi": ... },
+          "deribit": { "gex": ..., "oi": ... }
+        }
+      }
+    ],
+    "metadata": { ... }
+  }
+}
+```
+
+<Info>
+The exact structure may include additional fields (puts/calls breakdown,
+notional values, etc.). Treat undocumented fields as stable but unversioned —
+we won't remove them without notice, but new fields may be added.
+</Info>
+
+## Errors
+
+<ResponseField name="400 invalid_exchange" type="error">
+  Exchange name not recognized.
+</ResponseField>
+
+<ResponseField name="404 no_data" type="error">
+  No data available for this coin/exchange combination.
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.gammaflip.io/api/v1/gex/term-oi/all/BTC \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+```python Python
+import requests
+
+resp = requests.get(
+    "https://api.gammaflip.io/api/v1/gex/term-oi/all/BTC",
+    headers={"X-API-Key": "gex_sk_your_key_here"},
+)
+data = resp.json()["data"]
+for exp in data.get("expirations", []):
+    print(f"{exp['date']}: GEX={exp.get('total_gex'):,} OI={exp.get('total_oi'):,}")
+```
+
+```javascript Node.js
+const resp = await fetch(
+  "https://api.gammaflip.io/api/v1/gex/term-oi/all/BTC",
+  { headers: { "X-API-Key": "gex_sk_your_key_here" } }
+);
+const { data } = await resp.json();
+for (const exp of data.expirations || []) {
+  console.log(`${exp.date}: GEX=${exp.total_gex} OI=${exp.total_oi}`);
+}
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "data": {
+    "expirations": [
+      {
+        "date": "25APR26",
+        "total_gex": 142857000,
+        "total_oi": 12543,
+        "by_exchange": {
+          "bybit": { "gex": 42857000, "oi": 4200 },
+          "deribit": { "gex": 100000000, "oi": 8343 }
+        }
+      }
+    ]
+  },
+  "meta": {
+    "timestamp": "2026-04-14T10:00:00+00:00",
+    "exchange": "all",
+    "coin": "BTC",
+    "rate_limit": {
+      "limit": 500,
+      "remaining": 494,
+      "reset": "2026-04-15T00:00:00+00:00"
+    }
+  }
+}
+```
+
+</ResponseExample>
