@@ -1,0 +1,71 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "GammaFlip API",
+  "colors": {
+    "primary": "#6366f1",
+    "light": "#818cf8",
+    "dark": "#4f46e5"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "authentication",
+              "rate-limits",
+              "errors"
+            ]
+          },
+          {
+            "group": "MCP Integration",
+            "pages": [
+              "mcp-guide"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api-reference/exchanges",
+              "api-reference/coins",
+              "api-reference/expirations",
+              "api-reference/term-oi",
+              "api-reference/by-strike-enhanced"
+            ]
+          }
+        ],
+        "openapi": "openapi.yaml"
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:admin@gammaflip.io"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Pro",
+      "href": "https://gammaflip.io/subscribe?plan=pro"
+    }
+  },
+  "footer": {
+    "socials": {
+      "website": "https://gammaflip.io",
+      "github": "https://github.com/buchav/gammaflip-docs"
+    }
+  }
+}
