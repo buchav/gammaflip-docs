@@ -110,6 +110,11 @@ timing-specific trades.
   Exchange not recognized.
 </ResponseField>
 
+<ResponseField name="403 market_not_in_plan" type="error">
+  The coin belongs to a market your plan doesn't cover. See
+  [market_not_in_plan](/errors#market_not_in_plan-403).
+</ResponseField>
+
 <ResponseField name="404 no_data" type="error">
   No data for this coin/exchange/expiration combination. Common cause: the
   expiration doesn't exist on that exchange (use `/expirations/` first).
@@ -210,7 +215,7 @@ console.log("Strikes returned:", data.gex_data.strikes.length);
 ```json 404 Not Found
 {
   "error": "no_data",
-  "message": "No data available for BTC."
+  "message": "No data available for BTC 25APR26 on bybit."
 }
 ```
 

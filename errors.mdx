@@ -10,9 +10,19 @@ All errors return a JSON body with `error` and `message`:
 ```json
 {
   "error": "rate_limit_exceeded",
-  "message": "Daily limit of 500 reached."
+  "message": "Daily limit of 500 requests reached."
 }
 ```
+
+- **`error`** is a stable slug. Branch on this — it will not change for a
+  given condition.
+- **`message`** is prose for humans. **Never parse it**; the wording may change
+  at any time without notice.
+
+Some errors add context fields alongside those two (documented per error
+below). Errors are never wrapped in the `data` / `meta` envelope used by
+successful responses — on any endpoint — so `response.json()["error"]` is safe
+everywhere.
 
 ## HTTP status codes
 
@@ -21,7 +31,7 @@ All errors return a JSON body with `error` and `message`:
 | `200` | OK | — |
 | `400` | Bad Request | Invalid exchange name, malformed parameters |
 | `401` | Unauthorized | Missing or invalid API key |
-| `403` | Forbidden | Subscription doesn't allow API access |
+| `403` | Forbidden | Subscription doesn't allow API access (`subscription_required`), or the symbol belongs to a market your plan doesn't cover (`market_not_in_plan`) |
 | `404` | Not Found | No data available for this coin/exchange/expiration |
 | `429` | Too Many Requests | Daily quota exceeded — see [rate limits](/rate-limits) |
 | `500` | Server Error | Something went wrong on our side — retry or contact support |
@@ -31,7 +41,10 @@ All errors return a JSON body with `error` and `message`:
 ### `unauthorized` (401)
 
 ```json
-{ "error": "unauthorized", "message": "Invalid or missing API key." }
+{
+  "error": "unauthorized",
+  "message": "Authentication required. Supply an X-API-Key header or Authorization: Bearer <token>."
+}
 ```
 
 Check that:
@@ -40,13 +53,20 @@ Check that:
 - The key hasn't been revoked
 - The key starts with `gex_sk_`
 
+<Note>
+`unauthorized` covers two cases: no credential was supplied, and a credential
+was supplied but did not resolve to a user — the latter returns
+`"Could not resolve a user identity from the supplied credentials."` Both share
+one code deliberately, so you only need a single branch.
+</Note>
+
 ### `subscription_required` (403)
 
 ```json
 {
   "error": "subscription_required",
-  "message": "API access requires Pro subscription or active trial.",
-  "current_tier": "premium"
+  "message": "API access is not included in your plan.",
+  "current_tier": "free"
 }
 ```
 
@@ -54,21 +74,53 @@ Your subscription doesn't include API access. The `current_tier` field shows
 your current plan. [Upgrade to Pro](https://gammaflip.io/subscribe?plan=pro)
 to get API access.
 
+### `market_not_in_plan` (403)
+
+```json
+{
+  "error": "market_not_in_plan",
+  "message": "Your plan does not include the tradfi market.",
+  "market": "tradfi",
+  "current_tier": "premium"
+}
+```
+
+Your key is valid and API access is enabled, but the symbol you requested
+belongs to a market your plan doesn't cover. GammaFlip sells **crypto** and
+**tradfi** as separate markets, so a crypto-only plan gets this on `SPX`, and a
+tradfi-only plan gets it on `BTC`.
+
+| Field | Meaning |
+|-------|---------|
+| `market` | The market the requested symbol belongs to: `crypto` or `tradfi` |
+| `current_tier` | Your current plan tier |
+
+Only endpoints taking a `<coin>` path parameter can return this. The discovery
+endpoints (`/exchanges`, `/coins`) list availability rather than market data,
+and are never gated this way.
+
+To fix it, add the market to your subscription, or request a symbol from a
+market you already have.
+
 ### `invalid_exchange` (400)
 
 ```json
 {
   "error": "invalid_exchange",
-  "message": "Exchange \"foo\" is not available."
+  "message": "Exchange 'kraken' is not available."
 }
 ```
 
-Valid values: `bybit`, `deribit`, `okx`, `all` (aggregated).
+Valid values: `bybit`, `deribit`, `okx`, and the virtual `all` / `combined`
+(aggregated).
 
 ### `no_data` (404)
 
 ```json
-{ "error": "no_data", "message": "No data available for XYZ." }
+{
+  "error": "no_data",
+  "message": "No data available for BTC 25APR26 on bybit."
+}
 ```
 
 The combination of coin/exchange/expiration doesn't exist. Common causes:
@@ -79,8 +131,23 @@ The combination of coin/exchange/expiration doesn't exist. Common causes:
 ### `rate_limit_exceeded` (429)
 
 ```json
-{ "error": "rate_limit_exceeded", "message": "Daily limit of 500 reached." }
+{
+  "error": "rate_limit_exceeded",
+  "message": "Daily limit of 500 requests reached.",
+  "rate_limit": {
+    "limit": 500,
+    "remaining": 0,
+    "reset": "2026-07-28T00:00:00+00:00"
+  }
+}
 ```
+
+The `rate_limit` object repeats the figures from the `X-RateLimit-*` headers.
+
+<Warning>
+**No `Retry-After` header is sent.** Schedule your retry from
+`X-RateLimit-Reset` (or the identical `rate_limit.reset` in the body).
+</Warning>
 
 See [Rate Limits](/rate-limits) for handling strategies.
 

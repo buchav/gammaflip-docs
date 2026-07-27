@@ -36,6 +36,11 @@ description: 'Returns sorted, non-expired option expiration dates'
   Exchange name isn't recognized. Use `/exchanges` to list valid values.
 </ResponseField>
 
+<ResponseField name="403 market_not_in_plan" type="error">
+  The coin belongs to a market your plan doesn't cover. See
+  [market_not_in_plan](/errors#market_not_in_plan-403).
+</ResponseField>
+
 <RequestExample>
 
 ```bash cURL
@@ -86,7 +91,7 @@ for exp in resp.json()["data"]["expirations"]:
 ```json 400 Bad Request
 {
   "error": "invalid_exchange",
-  "message": "Exchange \"kraken\" is not available."
+  "message": "Exchange 'kraken' is not available."
 }
 ```
 

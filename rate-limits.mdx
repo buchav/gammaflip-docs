@@ -57,9 +57,30 @@ Content-Type: application/json
 
 {
   "error": "rate_limit_exceeded",
-  "message": "Daily limit of 500 reached."
+  "message": "Daily limit of 500 requests reached.",
+  "rate_limit": {
+    "limit": 500,
+    "remaining": 0,
+    "reset": "2026-04-15T00:00:00+00:00"
+  }
 }
 ```
+
+<Warning>
+**No `Retry-After` header is sent on a 429** — use `X-RateLimit-Reset`, as the
+examples below do.
+
+Until July 2026 the API did send `Retry-After`, carrying the ISO-8601 reset
+timestamp. That violates RFC 9110 — which permits only delay-seconds or an
+HTTP-date — so retry adapters that read the header automatically (urllib3
+`Retry`, axios-retry) could not parse it. It was removed rather than converted:
+the quota resets at midnight UTC, so the only correct delay-seconds value
+ranges up to 86400, and those same adapters would honour it by sleeping for
+hours.
+
+If your client reads `Retry-After`, switch it to `X-RateLimit-Reset` and apply
+your own backoff policy.
+</Warning>
 
 ### Recommended handling
 

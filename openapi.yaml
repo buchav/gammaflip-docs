@@ -69,6 +69,10 @@ components:
 
     Error:
       type: object
+      description: >
+        Standard error body. `error` is a stable slug safe to branch on;
+        `message` is human-readable prose and must not be parsed. Errors are
+        never wrapped in the data/meta envelope used by successful responses.
       required: [error, message]
       properties:
         error:
@@ -76,16 +80,27 @@ components:
           enum:
             - unauthorized
             - subscription_required
+            - market_not_in_plan
             - rate_limit_exceeded
             - invalid_exchange
             - no_data
           example: "rate_limit_exceeded"
         message:
           type: string
-          example: "Daily limit of 500 reached."
+          example: "Daily limit of 500 requests reached."
         current_tier:
           type: string
+          description: Present on `subscription_required` and `market_not_in_plan`.
           example: "free"
+        market:
+          type: string
+          description: Present on `market_not_in_plan` — the market the requested coin belongs to.
+          enum: [crypto, tradfi]
+          example: "tradfi"
+        rate_limit:
+          allOf:
+            - $ref: '#/components/schemas/RateLimit'
+          description: Present on `rate_limit_exceeded`; mirrors the X-RateLimit-* headers.
 
   parameters:
     Exchange:
@@ -108,12 +123,16 @@ components:
 
   responses:
     Unauthorized:
-      description: Invalid or missing API key
+      description: >
+        Missing or invalid credential, or a credential that does not resolve to
+        a user. Both return `unauthorized`.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     Forbidden:
-      description: Subscription required
+      description: >
+        Subscription required (`subscription_required`), or the requested coin
+        belongs to a market not in the plan (`market_not_in_plan`).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
