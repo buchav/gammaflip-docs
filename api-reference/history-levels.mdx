@@ -36,8 +36,9 @@ point-in-time semantics.
 </ParamField>
 
 <ParamField query="end" type="string">
-  ISO date or datetime, UTC. **Exclusive.** Default: now, floored to the 15-minute
-  capture grid. `start` after `end` returns `400 invalid_param`.
+  ISO date or datetime, UTC. **Exclusive.** Default: the end of the current
+  15-minute capture slot, so the newest capture is included. `start` after `end`
+  returns `400 invalid_param`.
 </ParamField>
 
 <ParamField query="granularity" type="string" default="close">
@@ -167,8 +168,8 @@ print(df[["session_date", "spot", "flip", "regime", "net_gex"]])
       "abs_gex": 9940000000.0,
       "call_gex": 6160000000.0,
       "put_gex": 3780000000.0,
-      "call_oi_total": 1204500.0,
-      "put_oi_total": 987300.0,
+      "call_oi_total": 1204500,
+      "put_oi_total": 987300,
       "p1_strike": 760, "p1_gex": 1300000000.0,
       "p2_strike": 755, "p2_gex": 910000000.0,
       "n1_strike": 740, "n1_gex": -820000000.0,

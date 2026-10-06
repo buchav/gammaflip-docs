@@ -39,10 +39,12 @@ Column layouts are in the [data dictionary](/data-dictionary#daily-history-files
 
 <ParamField query="start" type="string">
   First session date, `YYYY-MM-DD`, inclusive. Default: the earliest.
+  Years 2020 to 2100 are accepted.
 </ParamField>
 
 <ParamField query="end" type="string">
-  Last session date, `YYYY-MM-DD`, **exclusive**. Default: the latest.
+  Last session date, `YYYY-MM-DD`, **exclusive**. Default: the latest. `start` on
+  or after `end` returns `400 invalid_param`.
 </ParamField>
 
 <ResponseField name="data" type="array">
@@ -56,7 +58,11 @@ Column layouts are in the [data dictionary](/data-dictionary#daily-history-files
 
 `GET /history/files/{exchange}/{coin}/{date}/{file}` answers **`302 Found`** with a
 `Location` header: a presigned link to the file that is valid for up to 15
-minutes. Request the link again whenever you need it.
+minutes. Request the link again whenever you need it. The `302` is sent with
+`Cache-Control: no-store`, so do not cache it either.
+
+Use `GET`. A `HEAD` request returns `405 method_not_allowed` (with `Allow: GET`)
+and costs no credit.
 
 <ParamField path="date" type="string" required>
   Session date, `YYYY-MM-DD`.
@@ -79,7 +85,7 @@ redirect target, so follow the redirect in two steps as shown below.
 
 A successful download costs **one file credit** from the separate `history_files`
 daily bucket, not a request. A `400`, `404` or `503` never costs a credit, because
-the input and the file are checked first. The manifest listing is not a download:
+the input, the file and the link are checked and prepared first. The manifest listing is not a download:
 it costs a normal request. Limits and headers are in
 [Rate limits](/rate-limits#history-file-credits); see your balance in
 [`/me`](/api-reference/me).
@@ -92,9 +98,10 @@ The `302` and the `429` carry:
 | `X-History-Files-Remaining` | Credits left until reset (`0` together with a `0` limit means unlimited) |
 | `X-History-Files-Reset` | When the bucket resets (ISO 8601, UTC) |
 
-The headers may be missing if the quota service is briefly unavailable (the
+All three headers are missing if the quota service is briefly unavailable (the
 download then still proceeds). No `Retry-After` header is sent; read
-`X-History-Files-Reset`.
+`X-History-Files-Reset`. Browser clients can read these headers (they are listed
+in CORS `Access-Control-Expose-Headers`).
 
 ## Errors
 
@@ -115,7 +122,12 @@ download then still proceeds). No `Retry-After` header is sent; read
 
 <ResponseField name="400 invalid_param" type="error">
   `file` is not one of the three kinds (the body includes `valid_values`), or a
-  date is not `YYYY-MM-DD`.
+  date is not `YYYY-MM-DD`. On the listing: a year outside 2020 to 2100, or
+  `start` on or after `end`.
+</ResponseField>
+
+<ResponseField name="405 method_not_allowed" type="error">
+  The download was requested with `HEAD`. Use `GET`. Costs no credit.
 </ResponseField>
 
 <ResponseField name="400 history_not_available" type="error">
@@ -209,6 +221,7 @@ total = levels[levels["expiration"] == "TOTAL"]
 ```http 302 Found (download)
 HTTP/1.1 302 Found
 Location: https://...presigned-link...
+Cache-Control: no-store
 X-History-Files-Limit: 200
 X-History-Files-Remaining: 199
 X-History-Files-Reset: 2026-10-07T00:00:00+00:00

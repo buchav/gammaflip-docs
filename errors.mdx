@@ -36,6 +36,7 @@ let a client or an agent correct itself:
 | `401` | Unauthorized | Missing or invalid API key |
 | `403` | Forbidden | Plan has no API access, or doesn't include the market |
 | `404` | Not Found | No data available for this coin/exchange/expiration, or no history snapshot or file |
+| `405` | Method Not Allowed | `HEAD` on a history file download — use `GET` |
 | `429` | Too Many Requests | Daily request quota or daily history file credits exceeded — see [rate limits](/rate-limits) |
 | `500` | Server Error | Something went wrong on our side — retry or contact support |
 | `503` | Service Unavailable | A data source (for example TradFi) or history file storage is temporarily unavailable — retry later |
@@ -232,6 +233,15 @@ complete yet. No file credit is spent.
 ```
 
 File storage is down or not reachable. Retry later. No file credit is spent.
+
+#### `method_not_allowed` (405)
+
+```json
+{ "error": "method_not_allowed", "message": "Use GET to download a history file." }
+```
+
+A history file download was requested with `HEAD`. The response has `Allow: GET`.
+No file credit is spent.
 
 #### `history_files_limit_exceeded` (429)
 

@@ -92,7 +92,11 @@ One set of files per exchange, symbol and completed session, downloaded through
 - CSV, UTF-8, comma separated, one header row, gzip compressed
   (`<date>_<file>.csv.gz`).
 - Numbers are plain decimals: no thousands separators and no scientific notation.
+  Strikes and open interest have no decimal part when they are whole numbers
+  (`3`, not `3.0`).
 - An **empty cell means the value is missing** (the JSON API's `null`).
+- Rows are sorted by `timestamp_utc`; within one capture `TOTAL` comes first, then
+  the expirations by date, then strikes in ascending order.
 - `timestamp_utc` is ISO 8601 UTC with `Z`. `expiration` is an ISO date
   (`YYYY-MM-DD`) or `TOTAL`.
 - `schema_version` is `1`. Rows are never rewritten with later data; see
@@ -126,7 +130,7 @@ This is the easiest file for backtests: one row has the strike and the context
 
 ```csv
 schema_version,timestamp_utc,session_date,type,exchange,symbol,expiration,dte,oi_date,spot,flip,regime,net_gex,abs_gex,...,strike,strike_call_gex,strike_put_gex,strike_net_gex,strike_call_oi,strike_put_oi
-1,2026-10-05T20:15:00Z,2026-10-05,close,tradfi,QQQ,TOTAL,,2026-10-02,755.8,744.59,positive,2380000000.0,9940000000.0,...,760,1352000000.0,52000000.0,1300000000.0,88540.0,9120.0
+1,2026-10-05T20:15:00Z,2026-10-05,close,tradfi,QQQ,TOTAL,,2026-10-02,755.8,744.59,positive,2380000000.0,9940000000.0,...,760,1352000000.0,52000000.0,1300000000.0,88540,9120
 ```
 
 The example is illustrative and abbreviated (`...` replaces columns). `dte` is
