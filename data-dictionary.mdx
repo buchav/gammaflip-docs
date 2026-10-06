@@ -32,7 +32,7 @@ table.
 | `schema_version` | int | Format version, starts at 1. **History** |
 | `timestamp_utc` | ISO 8601 `Z` | Capture time, aligned to :00/:15/:30/:45. **History**; live: `meta.as_of` |
 | `session_date` | date | UTC date (crypto) or US trading date (TradFi). **History** |
-| `type` | `intraday` \| `close` | `close` = last capture of the session date. **History** |
+| `type` | `intraday` \| `close` | `close` = last capture of a **completed** session; every other row is `intraday`. **History** |
 | `exchange` | string | `bybit`, `deribit`, `okx`, `derive`, `combined`, `tradfi`. Live: `meta.exchange_resolved` |
 | `symbol` | string | `BTC`, `ETH`, …, `SPX`, `QQQ`, … Live: `meta.symbol` |
 | `expiration` | `TOTAL` \| date | `TOTAL` = all expirations captured at that moment (TradFi: ≤ 90 DTE). Live: returned in `data` of `/levels`, and as `meta.expiration` / `meta.expiration_iso` |
@@ -68,8 +68,8 @@ Live per-strike data comes from [GEX by Strike](/api-reference/by-strike-enhance
 as parallel arrays under `data.gex_data` (index `i` refers to the same strike
 across arrays). The stored history uses one row per strike with these fields, in
 [`/history/snapshot`](/api-reference/history-snapshot) (`data.strikes`) and in the
-`strikes_total` and `strikes_by_expiry` files. Only strikes within +/- 25% of the
-snapshot's spot are stored.
+`strikes_total` and `strikes_by_expiry` files. Files and snapshot responses include
+only strikes within +/- 25% of the snapshot's spot.
 
 | Field | Type | Description |
 |---|---|---|

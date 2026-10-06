@@ -181,7 +181,8 @@ components:
       description: |
         One stored `TOTAL` snapshot. `type` is `close` only for the last capture of a
         completed session. `oi_date` is the session whose open interest the row used.
-        The levels fields follow the `Levels` schema (`max_pain` is always `null` for `TOTAL`).
+        The levels fields follow the `Levels` schema (`max_pain` is `null` for `TOTAL`, so always `null` in the levels series;
+        a single-expiration snapshot may set it).
       allOf:
         - type: object
           properties:
@@ -1060,8 +1061,10 @@ paths:
               description: Presigned link, valid for up to 15 minutes.
               schema: { type: string, format: uri }
             X-History-Files-Limit:
+              description: Daily file credits; `0` means unlimited. Omitted if the quota service is unavailable.
               schema: { type: integer }
             X-History-Files-Remaining:
+              description: Credits left; `0` together with a `0` limit means unlimited. Omitted if the quota service is unavailable.
               schema: { type: integer }
             X-History-Files-Reset:
               schema: { type: string, format: date-time }
@@ -1079,6 +1082,7 @@ paths:
             header: use `X-History-Files-Reset` or `GET /me`.
           headers:
             X-History-Files-Limit:
+              description: Daily file credits (`0` means unlimited, which never yields a 429).
               schema: { type: integer }
             X-History-Files-Remaining:
               schema: { type: integer, example: 0 }

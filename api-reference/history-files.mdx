@@ -89,10 +89,12 @@ The `302` and the `429` carry:
 | Header | Meaning |
 |--------|---------|
 | `X-History-Files-Limit` | Your daily file credits (`0` = unlimited) |
-| `X-History-Files-Remaining` | Credits left until reset |
+| `X-History-Files-Remaining` | Credits left until reset (`0` together with a `0` limit means unlimited) |
 | `X-History-Files-Reset` | When the bucket resets (ISO 8601, UTC) |
 
-No `Retry-After` header is sent; read `X-History-Files-Reset`.
+The headers may be missing if the quota service is briefly unavailable (the
+download then still proceeds). No `Retry-After` header is sent; read
+`X-History-Files-Reset`.
 
 ## Errors
 
