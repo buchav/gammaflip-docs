@@ -5,17 +5,31 @@ description: 'Daily quotas, headers, and 429 handling'
 
 ## How quotas work
 
-Every API key has a **daily quota** that resets at **midnight UTC**. Every
-request to `/api/v1/*` counts as one.
+Your account has a **daily quota** that resets at **midnight UTC**, shared by
+all your API keys. API access is a **plan entitlement** (`api_access`), not a tier
+name: any plan that includes it can use the API. The quota depends on the plan:
 
-| Tier | Daily quota |
+| Plan | Daily quota |
 |------|-------------|
-| `trial` | 50 requests/day |
-| `pro` | 500 requests/day |
+| Trial | 50 requests/day |
+| Other plans with API access | 500 requests/day |
+
+### What counts
+
+| Endpoint | Counted? |
+|----------|----------|
+| `/gex/term-oi/...`, `/gex/by-strike-enhanced/...` | Yes, 1 request each |
+| `/levels/...` | Yes, 1 request |
+| `/exchanges`, `/coins`, `/expirations/...` | **Free** |
+| `/me` | **Free** |
+
+Discovery and [`/me`](/api-reference/me) are free so clients and agents don't burn
+quota finding out what exists or how much is left. Requests that fail
+authentication or entitlement checks (`401`, `403`) are not counted.
 
 ## Rate limit headers
 
-Every response includes three headers:
+Every **counted** response includes three headers (free endpoints don't):
 
 ```
 X-RateLimit-Limit: 500
@@ -46,7 +60,12 @@ The `rate_limit` field in the response body contains the same information:
 
 ## Handling 429 responses
 
-When you exceed your quota:
+When you exceed your quota the API answers `429` and **does not send a
+`Retry-After` header**. The quota resets at midnight UTC, so any honest
+delay-in-seconds could be up to 86400, and HTTP clients that obey `Retry-After`
+automatically would sleep for hours. Read `X-RateLimit-Reset` (ISO 8601, UTC) or
+call the free [`/me`](/api-reference/me) (`quota.requests.reset`) and decide for
+yourself:
 
 ```http
 HTTP/1.1 429 Too Many Requests
@@ -57,7 +76,8 @@ Content-Type: application/json
 
 {
   "error": "rate_limit_exceeded",
-  "message": "Daily limit of 500 reached."
+  "message": "Daily limit of 500 requests reached.",
+  "rate_limit": { "limit": 500, "remaining": 0, "reset": "2026-04-15T00:00:00+00:00" }
 }
 ```
 
@@ -122,13 +142,15 @@ more often than that doesn't yield new data. A typical trading bot pattern:
 
 - `term-oi` for BTC + ETH every 15 min = 2 × 4 = **8 req/hour**
 - `by-strike-enhanced` for 2-3 expirations every 15 min = ~10 req/hour
-- Discovery endpoints (rare, cached locally) = **1-2 req/day**
+- Discovery endpoints and `/me`: **free**
 
-**Total: ~430 req/day for a busy bot** — comfortably within the 500/day Pro quota.
+**Total: ~430 req/day for a busy bot**, within the 500/day quota.
 
 ## Running out of quota?
 
 - **Cache responses locally.** The data only changes every 15 min.
-- **Use the virtual `all` exchange** instead of calling each exchange separately.
+- **Use the virtual `all` exchange** (or a subset like `deribit+derive`) instead of calling each exchange separately.
+- **Use [`/levels`](/api-reference/levels)** when you only need flip, regime and walls: one small call instead of a full by-strike payload.
+- **Check [`/me`](/api-reference/me)** instead of probing: it is free.
 - **Reduce polling frequency** to once every 30 min if you don't need sub-15-min latency.
 - **Contact us** at [admin@gammaflip.io](mailto:admin@gammaflip.io) if you need a higher custom limit.

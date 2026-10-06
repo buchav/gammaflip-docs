@@ -1,0 +1,81 @@
+---
+title: 'Markets and exchanges'
+description: 'Crypto venues, TradFi tickers, aliases, subsets and expiration cutoffs'
+---
+
+The API serves two markets. Which one a request belongs to is decided by the
+**coin** in the path, and the `{exchange}` must match it.
+
+| Market | Coins | `{exchange}` values |
+|--------|-------|---------------------|
+| `crypto` | `BTC`, `ETH`, `SOL`, … | `bybit`, `deribit`, `okx`, `derive`, `all` / `combined`, or a subset such as `deribit+derive` |
+| `tradfi` | US index, ETF and equity tickers such as `SPX`, `SPY`, `QQQ`, `IWM` | `tradfi` (aliases: `all`, `combined`) |
+
+Call [`/exchanges`](/api-reference/exchanges) and [`/coins`](/api-reference/coins)
+for the live lists. Both return a `markets` field with the split by market. They
+are free and not counted against your quota.
+
+<Note>
+Each market is a separate entitlement on your plan. A request for a coin from a
+market your plan does not include returns `403 market_not_in_plan` with
+`markets_in_plan`. Call [`/me`](/api-reference/me) to see yours.
+</Note>
+
+## Crypto venues
+
+`bybit`, `deribit`, `okx` and `derive` are single venues. `all` (or `combined`)
+merges every venue that is currently available for the coin.
+
+### Subsets
+
+Join venues with `+` to merge just those, for example `deribit+derive`.
+Order and duplicates do not matter: the response reports the canonical form in
+`meta.exchange_resolved` (here `deribit+derive`).
+
+```bash
+curl "https://api.gammaflip.io/api/v1/levels/deribit+derive/ETH" \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+## TradFi
+
+TradFi tickers have a single venue, `tradfi`. For a TradFi ticker `all` and
+`combined` are aliases of `tradfi`, so older calls such as `all/SPY` keep working;
+`meta.exchange_resolved` is always `"tradfi"`.
+
+```bash
+curl https://api.gammaflip.io/api/v1/levels/tradfi/QQQ \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+Mixing the two sides is rejected with a hint:
+
+| Request | Result |
+|---------|--------|
+| `deribit/QQQ` (crypto venue, TradFi ticker) | `400 invalid_pair`, `valid_exchanges: ["tradfi"]` |
+| `tradfi/BTC` (TradFi venue, crypto coin) | `400 invalid_pair`, `valid_exchanges` lists the crypto venues |
+| `kraken/BTC` | `400 invalid_exchange`, `valid_exchanges` |
+
+See [Errors](/errors) for the full catalog.
+
+## Expiration cutoffs
+
+An expiration is listed until its settlement cutoff (plus a one-hour grace
+period), and its `expirations_detail` entry reports the cutoff as `cutoff_utc`.
+
+| Market | Cutoff |
+|--------|--------|
+| `crypto` | 08:00 UTC on the expiration date |
+| `tradfi` | 16:00 US Eastern (market close), daylight-saving aware |
+
+A same-day expiration is flagged `is_0dte: true` in
+[`/expirations`](/api-reference/expirations). Expiration path parameters accept
+the code (`17OCT26`), the ISO date (`2026-10-17`) or `TOTAL`.
+
+## Freshness
+
+Every data response says how fresh it is in `meta`: `as_of`, `oi_as_of`,
+`data_source`, `is_live`, `market_open` and `next_open`. For TradFi, open
+interest is published once a day, so during a session `oi_as_of` is the
+previous trading day while spot and the gamma profile are live. Crypto is live
+and always reports `market_open: true`. See the [data dictionary](/data-dictionary).

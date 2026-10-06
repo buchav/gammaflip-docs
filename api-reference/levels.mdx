@@ -1,0 +1,171 @@
+---
+title: 'Levels'
+api: 'GET /levels/{exchange}/{coin}'
+description: 'Where are we now: flip, regime, walls and totals for the latest snapshot'
+---
+
+## What it returns
+
+One flat object describing the latest GEX snapshot: spot, the primary gamma flip,
+the dealer regime, the largest positive / negative / absolute GEX strikes,
+net and absolute totals, the stability and volatility levels, max pain and ATM
+implied volatility. No per-strike arrays, so the response is small, which makes
+this the first call for a script or an LLM agent.
+
+Costs **1 request** against your [daily quota](/rate-limits). Field definitions,
+units and sign convention are in the [data dictionary](/data-dictionary).
+
+## Path parameters
+
+<ParamField path="exchange" type="string" required>
+  Crypto: `bybit`, `deribit`, `okx`, `derive`, `all` / `combined`, or a subset
+  such as `deribit+derive`. TradFi tickers: `tradfi` (`all` and `combined` are
+  aliases). See [Markets and exchanges](/markets-and-exchanges).
+</ParamField>
+
+<ParamField path="coin" type="string" required>
+  Symbol, for example `BTC`, `ETH`, `QQQ`, `SPX`. Case-insensitive. Use
+  [`/coins`](/api-reference/coins) to see what is available.
+</ParamField>
+
+## Query parameters
+
+<ParamField query="expiration" type="string" default="TOTAL">
+  `TOTAL` (all expirations combined), an expiration code such as `17OCT26`, or an
+  ISO date such as `2026-10-17`. `max_pain` is `null` for `TOTAL`.
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="object">
+  The levels fields (`spot`, `flip`, `flip_count`, `regime`, `net_gex`,
+  `abs_gex`, `call_gex`, `put_gex`, `call_oi_total`, `put_oi_total`,
+  `p1_strike` … `a2_gex`, `s_price`, `s_gex`, `v_price`, `v_gex`, `max_pain`,
+  `atm_iv`) plus `expiration` (`TOTAL` or the code) and `expiration_iso`
+  (`YYYY-MM-DD`, `null` for `TOTAL`). Missing values are `null`.
+</ResponseField>
+
+<ResponseField name="meta" type="object">
+  Freshness and context: `as_of`, `oi_as_of`, `data_source`, `is_live`,
+  `market_open`, `next_open`, `units`, `docs_url`, `exchange_resolved`,
+  `market`, `symbol`, plus the echoed `exchange`, `coin`, `expiration` and
+  `expiration_iso`, and your `rate_limit`.
+  See [Response meta](/api-reference/by-strike-enhanced#response-meta).
+</ResponseField>
+
+## Errors
+
+<ResponseField name="400 invalid_exchange / invalid_pair" type="error">
+  Unknown venue, or a venue that does not match the coin's market. The body
+  includes `valid_exchanges`.
+</ResponseField>
+
+<ResponseField name="400 invalid_expiration" type="error">
+  The expiration is not listed. The body includes `nearest_expirations`.
+</ResponseField>
+
+<ResponseField name="403 market_not_in_plan" type="error">
+  Your plan does not include this coin's market. The body includes
+  `markets_in_plan`.
+</ResponseField>
+
+<ResponseField name="404 no_data" type="error">
+  No snapshot for this combination.
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.gammaflip.io/api/v1/levels/tradfi/QQQ \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+```python Python
+import requests
+
+resp = requests.get(
+    "https://api.gammaflip.io/api/v1/levels/tradfi/QQQ",
+    headers={"X-API-Key": "gex_sk_your_key_here"},
+)
+body = resp.json()
+lv, meta = body["data"], body["meta"]
+print(f"{meta['symbol']} spot {lv['spot']} flip {lv['flip']} regime {lv['regime']}")
+print("as of", meta["as_of"], "| OI as of", meta["oi_as_of"])
+```
+
+```javascript Node.js
+const resp = await fetch("https://api.gammaflip.io/api/v1/levels/tradfi/QQQ", {
+  headers: { "X-API-Key": "gex_sk_your_key_here" },
+});
+const { data, meta } = await resp.json();
+console.log(data.regime, data.flip, meta.as_of);
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "data": {
+    "spot": 755.8,
+    "flip": 744.59,
+    "flip_count": 1,
+    "regime": "positive",
+    "net_gex": 2380000000.0,
+    "abs_gex": 9940000000.0,
+    "call_gex": 6160000000.0,
+    "put_gex": 3780000000.0,
+    "call_oi_total": 1204500.0,
+    "put_oi_total": 987300.0,
+    "p1_strike": 760, "p1_gex": 1300000000.0,
+    "p2_strike": 755, "p2_gex": 910000000.0,
+    "n1_strike": 740, "n1_gex": -820000000.0,
+    "n2_strike": 735, "n2_gex": -540000000.0,
+    "a1_strike": 760, "a1_gex": 1404000000.0,
+    "a2_strike": 750, "a2_gex": 1120000000.0,
+    "s_price": 758.0, "s_gex": 1900000000.0,
+    "v_price": 735.0, "v_gex": -1100000000.0,
+    "max_pain": null,
+    "atm_iv": 0.19,
+    "expiration": "TOTAL",
+    "expiration_iso": null
+  },
+  "meta": {
+    "timestamp": "2026-10-06T15:15:04.120000+00:00",
+    "exchange": "tradfi",
+    "coin": "QQQ",
+    "exchange_resolved": "tradfi",
+    "market": "tradfi",
+    "symbol": "QQQ",
+    "as_of": "2026-10-06T15:15:00Z",
+    "oi_as_of": "2026-10-05",
+    "data_source": "live",
+    "is_live": true,
+    "market_open": true,
+    "next_open": null,
+    "units": "USD per 1% move of the underlying",
+    "docs_url": "https://docs.gammaflip.io/data-dictionary",
+    "expiration": "TOTAL",
+    "expiration_iso": null,
+    "rate_limit": { "limit": 500, "remaining": 497, "reset": "2026-10-07T00:00:00+00:00" }
+  }
+}
+```
+
+```json 400 Bad Request
+{
+  "error": "invalid_expiration",
+  "message": "Expiration '2026-10-18' is not listed.",
+  "nearest_expirations": ["2026-10-17", "2026-10-19", "2026-10-21"]
+}
+```
+
+</ResponseExample>
+
+<Note>
+The values above are illustrative (a TradFi snapshot taken during the US session).
+`max_pain` is `null` because this call is for `TOTAL`; pass a single expiration
+to get it. When the market is closed, `data_source` and `is_live` say whether the
+snapshot is live or end-of-day, and `next_open` carries the next open.
+</Note>

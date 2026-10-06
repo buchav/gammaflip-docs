@@ -3,10 +3,17 @@ info:
   title: GammaFlip GEX API
   version: '1.0.0'
   description: |
-    Programmatic access to Gamma Exposure (GEX) data for cryptocurrency options.
+    Programmatic access to Gamma Exposure (GEX) data for crypto options
+    (Bybit, Deribit, OKX, Derive) and US options (the `tradfi` exchange).
 
-    Requires a **Pro subscription** (€35/month) or an active trial. Trial users
-    are limited to 50 requests/day; Pro users get 500 requests/day.
+    API access is a plan entitlement (`api_access`). The trial includes it
+    (50 requests/day); other plans with API access get 500 requests/day.
+    Only `/gex/...` and `/levels/...` count against the quota; `/exchanges`,
+    `/coins`, `/expirations/...` and `/me` are free. A `429` carries no
+    `Retry-After` header: use `X-RateLimit-Reset` or `/me`.
+
+    All GEX values are USD per 1% move of the underlying. Field definitions:
+    https://docs.gammaflip.io/data-dictionary
   contact:
     name: GammaFlip Support
     email: admin@gammaflip.io
@@ -43,6 +50,7 @@ components:
             timestamp:
               type: string
               format: date-time
+              description: When the response was generated.
               example: "2026-04-14T10:00:00+00:00"
             exchange:
               type: string
@@ -52,6 +60,129 @@ components:
               example: "BTC"
             rate_limit:
               $ref: '#/components/schemas/RateLimit'
+
+    DataMeta:
+      type: object
+      description: |
+        Self-describing `meta` of data responses (`/levels`, `/gex/...`). Keys are
+        additive; `exchange`, `coin` and `expiration` keep their existing values.
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-10-06T15:15:04.120000+00:00"
+        exchange:
+          type: string
+          description: The exchange as requested (lowercased).
+          example: "all"
+        coin:
+          type: string
+          example: "QQQ"
+        expiration:
+          type: string
+          description: Expiration code as used (`TOTAL` or `DDMMMYY`). Only on expiration-scoped endpoints.
+          example: "TOTAL"
+        expiration_iso:
+          type: [string, 'null']
+          description: Expiration as `YYYY-MM-DD`; `null` for `TOTAL`.
+          example: null
+        exchange_resolved:
+          type: string
+          description: Canonical venue after aliasing (`tradfi`, `deribit`, `combined`, `deribit+derive`, ...).
+          example: "tradfi"
+        market:
+          type: string
+          enum: [crypto, tradfi]
+        symbol:
+          type: string
+          example: "QQQ"
+        as_of:
+          type: [string, 'null']
+          format: date-time
+          description: Time the data reflects. ISO 8601 UTC with `Z`, second precision.
+          example: "2026-10-06T15:15:00Z"
+        oi_as_of:
+          type: [string, 'null']
+          description: Session date (`YYYY-MM-DD`) of the open interest used.
+          example: "2026-10-05"
+        data_source:
+          type: [string, 'null']
+          description: "`live`, `eod`, ... (crypto is always `live`)."
+          example: "live"
+        is_live:
+          type: [boolean, 'null']
+        market_open:
+          type: [boolean, 'null']
+          description: Always `true` for crypto.
+        next_open:
+          type: [string, 'null']
+          description: Next market open (TradFi); `null` for crypto.
+        units:
+          type: string
+          example: "USD per 1% move of the underlying"
+        docs_url:
+          type: string
+          example: "https://docs.gammaflip.io/data-dictionary"
+        rate_limit:
+          $ref: '#/components/schemas/RateLimit'
+
+    Levels:
+      type: object
+      description: |
+        The levels of one GEX snapshot. GEX values are USD per 1% move of the
+        underlying; `call_gex` and `put_gex` are non-negative, `net_gex = call_gex - put_gex`.
+        Missing values are `null`. See the data dictionary.
+      properties:
+        spot: { type: [number, 'null'], description: "Underlying price at capture." }
+        flip: { type: [number, 'null'], description: "Primary gamma-flip price (`flip_points[0]`), the net-gamma sign change nearest to spot." }
+        flip_count: { type: integer, description: "Number of zero crossings in the profile." }
+        regime:
+          type: [string, 'null']
+          enum: [positive, negative, null]
+          description: "`positive` if `spot >= flip`."
+        net_gex: { type: [number, 'null'], description: "Sum of call_gex minus sum of put_gex." }
+        abs_gex: { type: [number, 'null'], description: "Sum of call_gex plus sum of put_gex." }
+        call_gex: { type: [number, 'null'] }
+        put_gex: { type: [number, 'null'] }
+        call_oi_total: { type: [number, 'null'], description: "Sum of call open interest in contracts." }
+        put_oi_total: { type: [number, 'null'], description: "Sum of put open interest in contracts." }
+        p1_strike: { type: [number, 'null'], description: "Strike with the largest positive net GEX." }
+        p1_gex: { type: [number, 'null'] }
+        p2_strike: { type: [number, 'null'] }
+        p2_gex: { type: [number, 'null'] }
+        n1_strike: { type: [number, 'null'], description: "Strike with the most negative net GEX." }
+        n1_gex: { type: [number, 'null'] }
+        n2_strike: { type: [number, 'null'] }
+        n2_gex: { type: [number, 'null'] }
+        a1_strike: { type: [number, 'null'], description: "Strike with the largest absolute GEX (call + put)." }
+        a1_gex: { type: [number, 'null'] }
+        a2_strike: { type: [number, 'null'] }
+        a2_gex: { type: [number, 'null'] }
+        s_price: { type: [number, 'null'], description: "Max-stability level, the peak of the net-gamma profile (a price)." }
+        s_gex: { type: [number, 'null'] }
+        v_price: { type: [number, 'null'], description: "Max-volatility level, the trough of the net-gamma profile (a price)." }
+        v_gex: { type: [number, 'null'] }
+        max_pain: { type: [number, 'null'], description: "Per-expiration max-pain strike; `null` for TOTAL." }
+        atm_iv: { type: [number, 'null'], description: "ATM implied volatility as a decimal (0.18 = 18%)." }
+
+    ExpirationDetail:
+      type: object
+      properties:
+        code: { type: string, example: "17OCT26" }
+        iso: { type: [string, 'null'], example: "2026-10-17" }
+        dte: { type: [number, 'null'], description: "Days to the cutoff (two decimals).", example: 11.2 }
+        cutoff_utc: { type: [string, 'null'], format: date-time, example: "2026-10-17T20:00:00Z" }
+        is_0dte: { type: boolean }
+
+    Markets:
+      type: object
+      properties:
+        crypto:
+          type: array
+          items: { type: string }
+        tradfi:
+          type: array
+          items: { type: string }
 
     RateLimit:
       type: object
@@ -70,41 +201,103 @@ components:
     Error:
       type: object
       required: [error, message]
+      description: |
+        `error` is a stable slug to branch on; `message` is prose and may change.
+        Some errors add hint fields.
       properties:
         error:
           type: string
           enum:
             - unauthorized
             - subscription_required
+            - market_not_in_plan
             - rate_limit_exceeded
             - invalid_exchange
+            - invalid_pair
+            - invalid_expiration
+            - invalid_param
             - no_data
-          example: "rate_limit_exceeded"
+            - market_unavailable
+          example: "invalid_exchange"
         message:
           type: string
-          example: "Daily limit of 500 reached."
+          example: "Exchange 'kraken' is not available."
         current_tier:
           type: string
-          example: "free"
+          description: With `subscription_required` and `market_not_in_plan`.
+          example: "trial"
+        valid_exchanges:
+          type: array
+          items: { type: string }
+          description: With `invalid_exchange` and `invalid_pair`.
+          example: ["deribit", "bybit", "okx", "derive", "combined"]
+        nearest_expirations:
+          type: array
+          items: { type: string }
+          description: With `invalid_expiration`; up to five ISO dates closest to the request.
+          example: ["2026-10-17", "2026-10-19"]
+        valid_values:
+          type: array
+          items: { type: string }
+          description: With `invalid_param` for `view`.
+          example: ["full", "levels"]
+        max_value:
+          type: number
+          description: With `invalid_param` for `range_pct`.
+          example: 50
+        market:
+          type: string
+          description: With `market_not_in_plan`.
+        markets_in_plan:
+          type: array
+          items: { type: string }
+          description: With `market_not_in_plan`.
+        rate_limit:
+          $ref: '#/components/schemas/RateLimit'
+          description: With `rate_limit_exceeded`.
 
   parameters:
     Exchange:
       name: exchange
       in: path
       required: true
-      description: Exchange name (`bybit`, `deribit`, `okx`) or `all` for aggregated data.
+      description: |
+        Crypto: `bybit`, `deribit`, `okx`, `derive`, `all` / `combined`, or a `+`-joined
+        subset such as `deribit+derive`. TradFi tickers: `tradfi` (`all` and `combined`
+        are aliases). Use `/exchanges` for the live list.
       schema:
         type: string
-        enum: [bybit, deribit, okx, all, combined]
-        example: "all"
+        examples: ["all", "deribit+derive", "tradfi"]
     Coin:
       name: coin
       in: path
       required: true
-      description: Base coin symbol (uppercase).
+      description: Symbol (case-insensitive), for example `BTC` or `QQQ`. Use `/coins` for the list.
       schema:
         type: string
         example: "BTC"
+    View:
+      name: view
+      in: query
+      required: false
+      description: |
+        `full` (default) returns per-strike arrays, markers and metadata. `levels`
+        returns only `levels` and `metadata`.
+      schema:
+        type: string
+        enum: [full, levels]
+        default: full
+    RangePct:
+      name: range_pct
+      in: query
+      required: false
+      description: |
+        With `view=full`, keep only strikes within +/- this percent of spot in the
+        per-strike arrays. Number in (0, 50]. No effect with `view=levels`.
+      schema:
+        type: number
+        exclusiveMinimum: 0
+        maximum: 50
 
   responses:
     Unauthorized:
@@ -113,12 +306,23 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     Forbidden:
-      description: Subscription required
+      description: |
+        `subscription_required` (the plan has no API access) or `market_not_in_plan`
+        (the plan does not include the coin's market).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    BadRequest:
+      description: |
+        `invalid_exchange`, `invalid_pair`, `invalid_expiration` or `invalid_param`,
+        with hint fields (`valid_exchanges`, `nearest_expirations`, `valid_values`, `max_value`).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     RateLimited:
-      description: Daily rate limit exceeded
+      description: |
+        Daily rate limit exceeded. No `Retry-After` header is sent: use
+        `X-RateLimit-Reset` or `GET /me`.
       headers:
         X-RateLimit-Limit:
           schema: { type: integer }
@@ -135,18 +339,13 @@ paths:
     get:
       operationId: listExchanges
       summary: List available exchanges
-      description: Returns the list of supported exchanges and the virtual `all` aggregator.
+      description: |
+        Returns the exchanges currently available, plus the virtual `all` aggregator and
+        the same exchanges grouped by market. **Free**: not counted against the quota.
       tags: [Discovery]
       responses:
         '200':
           description: Exchange list
-          headers:
-            X-RateLimit-Limit:
-              schema: { type: integer }
-            X-RateLimit-Remaining:
-              schema: { type: integer }
-            X-RateLimit-Reset:
-              schema: { type: string, format: date-time }
           content:
             application/json:
               schema:
@@ -160,23 +359,25 @@ paths:
                           available:
                             type: array
                             items: { type: string }
-                            example: ["bybit", "deribit", "okx"]
+                            example: ["bybit", "deribit", "okx", "derive", "tradfi"]
                           virtual:
                             type: array
                             items: { type: string }
                             example: ["all"]
+                          markets:
+                            $ref: '#/components/schemas/Markets'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
-        '429':
-          $ref: '#/components/responses/RateLimited'
 
   /coins:
     get:
       operationId: listCoins
       summary: List available coins
-      description: Returns the union of base coins (BTC, ETH, SOL, XRP, etc.) across all exchanges.
+      description: |
+        Returns the union of symbols across all exchanges (crypto coins and TradFi tickers),
+        plus the same list split by market. **Free**: not counted against the quota.
       tags: [Discovery]
       responses:
         '200':
@@ -194,19 +395,75 @@ paths:
                           coins:
                             type: array
                             items: { type: string }
-                            example: ["BTC", "ETH", "SOL", "XRP"]
+                            example: ["BTC", "ETH", "QQQ", "SOL", "SPX"]
+                          markets:
+                            $ref: '#/components/schemas/Markets'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /me:
+    get:
+      operationId: getMe
+      summary: Your plan, markets and quota
+      description: |
+        Returns your tier, the markets your plan includes, `api_access`, and today's quota.
+        **Free**: not counted against the quota. Use it to find out when the quota resets
+        (a 429 carries no `Retry-After`).
+      tags: [Discovery]
+      responses:
+        '200':
+          description: Account info
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          tier:
+                            type: string
+                            example: "trial"
+                          markets:
+                            type: array
+                            items: { type: string }
+                            example: ["crypto", "tradfi"]
+                          api_access:
+                            type: boolean
+                          quota:
+                            type: object
+                            properties:
+                              requests:
+                                type: object
+                                properties:
+                                  limit:
+                                    type: integer
+                                    description: Daily limit; 0 means unlimited.
+                                    example: 50
+                                  used:
+                                    type: [integer, 'null']
+                                    example: 13
+                                  remaining:
+                                    type: [integer, 'null']
+                                    example: 37
+                                  reset:
+                                    type: string
+                                    format: date-time
+                                    example: "2026-10-07T00:00:00+00:00"
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /expirations/{exchange}/{coin}:
     get:
       operationId: listExpirations
-      summary: List expiration dates
+      summary: List expirations
       description: |
-        Returns sorted, non-expired option expiration dates for a given exchange and coin.
-
-        Pass `all` as `exchange` for aggregated data across all exchanges.
+        Returns sorted, non-expired option expirations for a given exchange and coin.
+        `expirations` keeps the `DDMMMYY` codes; `expirations_detail` adds the ISO date,
+        days to the cutoff, the cutoff instant and a 0DTE flag. The cutoff is 08:00 UTC for
+        crypto and 16:00 US Eastern for TradFi. **Free**: not counted against the quota.
       tags: [Discovery]
       parameters:
         - $ref: '#/components/parameters/Exchange'
@@ -228,14 +485,67 @@ paths:
                             type: array
                             items: { type: string }
                             example: ["25APR26", "02MAY26", "09MAY26", "27JUN26"]
-        '400':
-          description: Invalid exchange name
+                          expirations_detail:
+                            type: array
+                            items: { $ref: '#/components/schemas/ExpirationDetail' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /levels/{exchange}/{coin}:
+    get:
+      operationId: getLevels
+      summary: Levels for the latest snapshot
+      description: |
+        Where are we now: flip, regime, walls, totals, stability and volatility levels,
+        max pain and ATM IV for the latest snapshot, as one flat object. Small payload,
+        the first call for a script or an LLM agent. Counts as 1 request.
+      tags: [Data]
+      parameters:
+        - $ref: '#/components/parameters/Exchange'
+        - $ref: '#/components/parameters/Coin'
+        - name: expiration
+          in: query
+          required: false
+          description: "`TOTAL` (default), an expiration code (`17OCT26`) or an ISO date (`2026-10-17`)."
+          schema:
+            type: string
+            default: TOTAL
+      responses:
+        '200':
+          description: Levels
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/Levels'
+                      - type: object
+                        properties:
+                          expiration:
+                            type: string
+                            example: "TOTAL"
+                          expiration_iso:
+                            type: [string, 'null']
+                  meta:
+                    $ref: '#/components/schemas/DataMeta'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No data available
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: TradFi data temporarily unavailable (`market_unavailable`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /gex/term-oi/{exchange}/{coin}:
     get:
@@ -246,6 +556,7 @@ paths:
 
         Use `all` as `exchange` to get aggregated data across all exchanges.
         This is the most common endpoint for building term-structure dashboards.
+        Counts as 1 request.
       tags: [Data]
       parameters:
         - $ref: '#/components/parameters/Exchange'
@@ -255,25 +566,41 @@ paths:
           description: Term structure data
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Envelope' }
-        '400':
-          description: Invalid exchange
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: object
+                  meta:
+                    $ref: '#/components/schemas/DataMeta'
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':
           description: No data available for this coin/exchange
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: TradFi data temporarily unavailable (`market_unavailable`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /gex/by-strike-enhanced/{exchange}/{coin}/{expiration}:
     get:
       operationId: getByStrikeEnhanced
       summary: GEX by strike with key markers
       description: |
-        Returns GEX data broken down by strike price, plus key markers —
-        gamma flip, max pain, positive/negative walls, max-volatility and
-        max-stability price levels, spot reference, and aggregate totals.
+        Returns GEX data broken down by strike price, plus key markers (gamma flip, max
+        pain, positive/negative walls, max-volatility and max-stability price levels, spot
+        reference, aggregate totals) and a flat `levels` object.
 
-        Pass `TOTAL` as `expiration` to get all expirations combined.
+        Pass `TOTAL` as `expiration` to get all expirations combined. Use `view=levels`
+        for a compact response without per-strike arrays, or `range_pct` to trim the
+        strike arrays around spot. Counts as 1 request.
       tags: [Data]
       parameters:
         - $ref: '#/components/parameters/Exchange'
@@ -281,20 +608,42 @@ paths:
         - name: expiration
           in: path
           required: true
-          description: Expiration date in `DDMMMYY` format (e.g., `25APR26`) or `TOTAL` for all expirations.
+          description: Expiration in `DDMMMYY` format (e.g., `25APR26`), an ISO date (`2026-04-25`) or `TOTAL` for all expirations.
           schema:
             type: string
             example: "25APR26"
+        - $ref: '#/components/parameters/View'
+        - $ref: '#/components/parameters/RangePct'
       responses:
         '200':
           description: GEX by strike data
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Envelope' }
-        '400':
-          description: Invalid exchange
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: object
+                    description: |
+                      With `view=full`: `gex_data`, `markers`, `metadata` and `levels`.
+                      With `view=levels`: `levels` and `metadata` only.
+                    properties:
+                      levels:
+                        $ref: '#/components/schemas/Levels'
+                  meta:
+                    $ref: '#/components/schemas/DataMeta'
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404':
           description: No data available
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503':
+          description: TradFi data temporarily unavailable (`market_unavailable`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }

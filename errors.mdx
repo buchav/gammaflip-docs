@@ -5,26 +5,38 @@ description: 'Error codes and how to handle them'
 
 ## Error format
 
-All errors return a JSON body with `error` and `message`:
+All errors return a JSON body with `error` and `message`. Branch on `error`, a
+stable slug; `message` is prose and may change. Some errors add hint fields that
+let a client or an agent correct itself:
 
 ```json
 {
-  "error": "rate_limit_exceeded",
-  "message": "Daily limit of 500 reached."
+  "error": "invalid_exchange",
+  "message": "Exchange 'kraken' is not available.",
+  "valid_exchanges": ["deribit", "bybit", "okx", "derive", "combined"]
 }
 ```
+
+| Hint field | Returned with |
+|------------|---------------|
+| `valid_exchanges` | `invalid_exchange`, `invalid_pair` |
+| `nearest_expirations` | `invalid_expiration` |
+| `valid_values` | `invalid_param` (for `view`) |
+| `max_value` | `invalid_param` (for `range_pct`) |
+| `markets_in_plan` | `market_not_in_plan` |
 
 ## HTTP status codes
 
 | Code | Meaning | Common causes |
 |------|---------|---------------|
 | `200` | OK | — |
-| `400` | Bad Request | Invalid exchange name, malformed parameters |
+| `400` | Bad Request | Invalid exchange, pair, expiration or parameter |
 | `401` | Unauthorized | Missing or invalid API key |
-| `403` | Forbidden | Subscription doesn't allow API access |
+| `403` | Forbidden | Plan has no API access, or doesn't include the market |
 | `404` | Not Found | No data available for this coin/exchange/expiration |
 | `429` | Too Many Requests | Daily quota exceeded — see [rate limits](/rate-limits) |
 | `500` | Server Error | Something went wrong on our side — retry or contact support |
+| `503` | Service Unavailable | A data source (for example TradFi) is temporarily unavailable — retry later |
 
 ## Error codes
 
@@ -45,25 +57,81 @@ Check that:
 ```json
 {
   "error": "subscription_required",
-  "message": "API access requires Pro subscription or active trial.",
+  "message": "API access is not included in your plan.",
   "current_tier": "premium"
 }
 ```
 
-Your subscription doesn't include API access. The `current_tier` field shows
-your current plan. [Upgrade to Pro](https://gammaflip.io/subscribe?plan=pro)
-to get API access.
+Your plan doesn't include API access (a plan entitlement, not a tier name).
+`current_tier` shows your current tier. [Get API access](https://gammaflip.io/subscribe).
+
+### `market_not_in_plan` (403)
+
+```json
+{
+  "error": "market_not_in_plan",
+  "message": "Your plan does not include the tradfi market.",
+  "market": "tradfi",
+  "current_tier": "premium",
+  "markets_in_plan": ["crypto"]
+}
+```
+
+The coin belongs to a market your plan doesn't include. `markets_in_plan` lists
+the markets you can use. [`/me`](/api-reference/me) shows the same.
 
 ### `invalid_exchange` (400)
 
 ```json
 {
   "error": "invalid_exchange",
-  "message": "Exchange \"foo\" is not available."
+  "message": "Exchange 'kraken' is not available.",
+  "valid_exchanges": ["deribit", "bybit", "okx", "derive", "combined"]
 }
 ```
 
-Valid values: `bybit`, `deribit`, `okx`, `all` (aggregated).
+For crypto coins valid values are `bybit`, `deribit`, `okx`, `derive`,
+`all` / `combined`, or a subset like `deribit+derive`; `valid_exchanges` lists
+what is currently available. See [Markets and exchanges](/markets-and-exchanges).
+
+### `invalid_pair` (400)
+
+```json
+{
+  "error": "invalid_pair",
+  "message": "QQQ is a TradFi ticker; use exchange 'tradfi'.",
+  "valid_exchanges": ["tradfi"]
+}
+```
+
+The exchange does not match the coin's market: a crypto venue with a TradFi
+ticker, or `tradfi` with a crypto coin.
+
+### `invalid_expiration` (400)
+
+```json
+{
+  "error": "invalid_expiration",
+  "message": "Expiration '2026-10-18' is not listed.",
+  "nearest_expirations": ["2026-10-17", "2026-10-19"]
+}
+```
+
+The expiration isn't one of the live expirations. Use `TOTAL`, or pick one from
+`nearest_expirations` or [`/expirations`](/api-reference/expirations).
+
+### `invalid_param` (400)
+
+```json
+{
+  "error": "invalid_param",
+  "message": "range_pct must be a number in (0, 50].",
+  "max_value": 50
+}
+```
+
+A query parameter is invalid: `view` must be `full` or `levels`
+(`valid_values`), and `range_pct` must be in (0, 50] (`max_value`).
 
 ### `no_data` (404)
 
@@ -71,10 +139,18 @@ Valid values: `bybit`, `deribit`, `okx`, `all` (aggregated).
 { "error": "no_data", "message": "No data available for XYZ." }
 ```
 
-The combination of coin/exchange/expiration doesn't exist. Common causes:
+The combination of coin/exchange/expiration has no data. Common causes:
 - The exchange doesn't list options for this coin (e.g., OKX doesn't have XRP)
 - The expiration has already expired
 - The basecoin is mistyped (must be uppercase)
+
+### `market_unavailable` (503)
+
+```json
+{ "error": "market_unavailable", "message": "TradFi data is temporarily unavailable." }
+```
+
+The data source for the market is down. Retry after a short delay.
 
 ### `rate_limit_exceeded` (429)
 
@@ -82,7 +158,9 @@ The combination of coin/exchange/expiration doesn't exist. Common causes:
 { "error": "rate_limit_exceeded", "message": "Daily limit of 500 reached." }
 ```
 
-See [Rate Limits](/rate-limits) for handling strategies.
+There is no `Retry-After` header. Use the `X-RateLimit-Reset` header or the free
+[`/me`](/api-reference/me) to find out when the quota resets. See
+[Rate Limits](/rate-limits) for handling strategies.
 
 ## Getting help
 

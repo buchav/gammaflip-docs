@@ -1,28 +1,37 @@
 ---
 title: 'List Exchanges'
 api: 'GET /exchanges'
-description: 'Returns available exchanges and virtual aggregators'
+description: 'Returns available exchanges grouped by market. Free: not counted against the quota'
 ---
 
 ## Response
 
 <ResponseField name="data.available" type="array">
-  List of exchange names whose caches are currently online and queryable.
-  Currently supported: `bybit`, `deribit`, `okx`.
+  List of exchange names currently online and queryable. Supported:
+  `bybit`, `deribit`, `okx`, `derive` and `tradfi`.
+</ResponseField>
+
+<ResponseField name="data.markets" type="object">
+  The same exchanges split by market: `{"crypto": [...], "tradfi": ["tradfi"]}`.
+  Crypto venues are in canonical order.
 </ResponseField>
 
 <ResponseField name="data.virtual" type="array">
-  List of virtual exchanges. Currently just `["all"]` — a cross-exchange
-  aggregator that combines data from every available exchange.
+  List of virtual exchanges. Currently just `["all"]`: a cross-exchange
+  aggregator for crypto coins (for TradFi tickers `all` is an alias of `tradfi`).
+  You can also request a subset of crypto venues with `+`, for example
+  `deribit+derive`. See [Markets and exchanges](/markets-and-exchanges).
 </ResponseField>
 
 <ResponseField name="meta.timestamp" type="string">
   ISO 8601 timestamp of when the response was generated.
 </ResponseField>
 
-<ResponseField name="meta.rate_limit" type="object">
-  Your current rate limit status — `limit`, `remaining`, `reset`.
-</ResponseField>
+<Note>
+This endpoint is free and does not count against your quota, so there is no
+`rate_limit` block or `X-RateLimit-*` header. Use [`/me`](/api-reference/me)
+to see your quota.
+</Note>
 
 <RequestExample>
 
@@ -55,16 +64,15 @@ console.log(await resp.json());
 ```json 200 OK
 {
   "data": {
-    "available": ["bybit", "deribit", "okx"],
-    "virtual": ["all"]
+    "available": ["bybit", "deribit", "okx", "derive", "tradfi"],
+    "virtual": ["all"],
+    "markets": {
+      "crypto": ["deribit", "bybit", "okx", "derive"],
+      "tradfi": ["tradfi"]
+    }
   },
   "meta": {
-    "timestamp": "2026-04-14T10:00:00+00:00",
-    "rate_limit": {
-      "limit": 500,
-      "remaining": 499,
-      "reset": "2026-04-15T00:00:00+00:00"
-    }
+    "timestamp": "2026-10-06T10:00:00+00:00"
   }
 }
 ```

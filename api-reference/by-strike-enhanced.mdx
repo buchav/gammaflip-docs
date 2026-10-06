@@ -13,6 +13,9 @@ For a specific expiration, this endpoint returns:
   max-volatility and max-stability price levels, spot reference, and aggregate totals
 - **Asymmetry metrics** — upside vs. downside GEX imbalance and bias direction
 - **Metadata** — current price, strike range, timestamp, exchange/coin/expiration
+- **Levels** — a flat `levels` object (flip, regime, walls, totals, max pain, ATM IV),
+  defined in the [data dictionary](/data-dictionary). The same object is returned on its own by
+  [`/levels`](/api-reference/levels)
 
 This is the most detailed GEX endpoint — it's what powers the "GEX by Strike"
 chart on [gammaflip.io](https://gammaflip.io).
@@ -20,16 +23,34 @@ chart on [gammaflip.io](https://gammaflip.io).
 ## Path parameters
 
 <ParamField path="exchange" type="string" required>
-  Exchange name: `bybit`, `deribit`, `okx`, or `all`.
+  Crypto: `bybit`, `deribit`, `okx`, `derive`, `all` / `combined`, or a subset
+  such as `deribit+derive`. TradFi tickers: `tradfi` (`all` and `combined` are
+  aliases). See [Markets and exchanges](/markets-and-exchanges).
 </ParamField>
 
 <ParamField path="coin" type="string" required>
-  Base coin symbol (uppercase).
+  Symbol, for example `BTC`, `ETH`, `QQQ`. Case-insensitive.
 </ParamField>
 
 <ParamField path="expiration" type="string" required>
-  Expiration date in `DDMMMYY` format (e.g., `25APR26`), or `TOTAL` to combine
-  all expirations into a single view.
+  Expiration date in `DDMMMYY` format (e.g., `25APR26`), as an ISO date
+  (`2026-04-25`), or `TOTAL` to combine all expirations into a single view.
+</ParamField>
+
+## Query parameters
+
+<ParamField query="view" type="string" default="full">
+  `full` (default, unchanged) returns the per-strike arrays, markers and
+  metadata. `levels` returns only `levels` and `metadata`: a compact answer
+  for scripts and LLM agents (a full `TOTAL` payload is tens of KB). Any other
+  value returns `400 invalid_param` with `valid_values`.
+</ParamField>
+
+<ParamField query="range_pct" type="number">
+  With `view=full`, keeps only strikes within ±`range_pct` % of spot in the
+  per-strike arrays. Must be in (0, 50]; otherwise `400 invalid_param` with
+  `max_value: 50`. Without it, you get the full strike range as before. It has no
+  effect with `view=levels`, which has no per-strike arrays.
 </ParamField>
 
 ## Response shape
@@ -85,6 +106,17 @@ chart on [gammaflip.io](https://gammaflip.io).
 }
 ```
 
+`data.levels` sits next to `gex_data`, `markers` and `metadata` and is purely
+additive; `markers` is unchanged. Example, trimmed:
+
+```json
+"levels": {
+  "spot": 74032.81, "flip": 74359.02, "flip_count": 1, "regime": "negative",
+  "net_gex": -2673859.22, "abs_gex": 23969427.97,
+  "p1_strike": 75000, "n1_strike": 73500, "max_pain": 73500, "atm_iv": 0.46
+}
+```
+
 ### Field guide
 
 - **`gex_data`** — parallel arrays; index `i` across all arrays refers to the same strike.
@@ -93,8 +125,8 @@ chart on [gammaflip.io](https://gammaflip.io).
   dealer hedging is positive-gamma (stabilising); below, it's negative-gamma (amplifying).
 - **`absolute_max` / `positive_max` / `negative_max`** — ranked lists of the largest absolute,
   positive, and negative GEX strikes. These are the "walls" where hedging flows concentrate.
-- **`stability_point`** — strike with the highest positive net GEX (strongest pinning effect).
-- **`volatility_point`** — strike with the most negative net GEX (biggest move-amplifier).
+- **`stability_point`** — max-stability level: the peak of the net-gamma profile (a price, not a strike).
+- **`volatility_point`** — max-volatility level: the trough of the net-gamma profile (a price, not a strike).
 - **`asymmetry`** — imbalance between upside and downside dealer exposure; `bias` is
   a qualitative read (`bullish` / `bearish` / `neutral`).
 
@@ -104,10 +136,49 @@ chart on [gammaflip.io](https://gammaflip.io).
 timing-specific trades.
 </Info>
 
+## Response meta
+
+Every data response (this endpoint, [`/levels`](/api-reference/levels) and
+[term-oi](/api-reference/term-oi)) carries a self-describing `meta`. The keys
+below are additive: `meta.exchange`, `meta.coin` and `meta.expiration` keep their
+existing values.
+
+| Field | Meaning |
+|-------|---------|
+| `as_of` | Time the data reflects. ISO 8601 UTC with `Z`, second precision |
+| `oi_as_of` | Session date (`YYYY-MM-DD`) of the open interest used. TradFi open interest settles once a day, so intraday it is the previous session |
+| `data_source` | `live`, `eod`, … (crypto is always `live`) |
+| `is_live` | `true` when the data is a live snapshot |
+| `market_open` | Whether the market is open (always `true` for crypto) |
+| `next_open` | Next market open (TradFi); `null` for crypto |
+| `units` | `"USD per 1% move of the underlying"` |
+| `docs_url` | Link to the [data dictionary](/data-dictionary) |
+| `exchange_resolved` | Canonical venue after aliasing: `tradfi`, `deribit`, `combined`, `deribit+derive`, … |
+| `market` | `crypto` or `tradfi` |
+| `symbol` | The symbol queried (same as `coin`) |
+| `expiration_iso` | The expiration as `YYYY-MM-DD` (`null` for `TOTAL`) |
+
+`meta.timestamp` is when the response was generated. `meta.rate_limit` shows your
+quota (this call counts as 1 request).
+
 ## Errors
 
-<ResponseField name="400 invalid_exchange" type="error">
-  Exchange not recognized.
+<ResponseField name="400 invalid_exchange / invalid_pair" type="error">
+  Exchange not recognized, or it does not match the coin's market. The body
+  includes `valid_exchanges`.
+</ResponseField>
+
+<ResponseField name="400 invalid_expiration" type="error">
+  The expiration is not listed. The body includes `nearest_expirations`
+  (up to five ISO dates closest to the one you sent).
+</ResponseField>
+
+<ResponseField name="400 invalid_param" type="error">
+  `view` or `range_pct` is invalid. The body includes `valid_values` or `max_value`.
+</ResponseField>
+
+<ResponseField name="403 market_not_in_plan" type="error">
+  Your plan does not include this coin's market. The body includes `markets_in_plan`.
 </ResponseField>
 
 <ResponseField name="404 no_data" type="error">
@@ -197,7 +268,19 @@ console.log("Strikes returned:", data.gex_data.strikes.length);
     "timestamp": "2026-04-14T10:00:00+00:00",
     "exchange": "all",
     "coin": "BTC",
+    "exchange_resolved": "combined",
+    "market": "crypto",
+    "symbol": "BTC",
+    "as_of": "2026-04-14T10:00:00Z",
+    "oi_as_of": "2026-04-14",
+    "data_source": "live",
+    "is_live": true,
+    "market_open": true,
+    "next_open": null,
+    "units": "USD per 1% move of the underlying",
+    "docs_url": "https://docs.gammaflip.io/data-dictionary",
     "expiration": "25APR26",
+    "expiration_iso": "2026-04-25",
     "rate_limit": {
       "limit": 500,
       "remaining": 492,

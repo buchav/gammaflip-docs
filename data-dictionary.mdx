@@ -1,0 +1,82 @@
+---
+title: 'Data dictionary'
+description: 'Units, sign convention and every field in the levels object'
+---
+
+## Units and sign convention
+
+All GEX values are **USD per 1 % move of the underlying**:
+`gex = gamma × open_interest × contract_multiplier × spot² × 0.01`, summed per strike.
+
+Dealer convention: calls add, puts subtract. `call_gex` and `put_gex` are
+**non-negative magnitudes**; `net_gex = call_gex − put_gex`.
+
+Numbers are plain decimals (no thousands separators, no scientific notation).
+Every response repeats the unit string in `meta.units`
+(`"USD per 1% move of the underlying"`) and links back to this page in `meta.docs_url`.
+
+## Levels fields
+
+These fields describe one GEX snapshot. They are returned by
+[`GET /levels/{exchange}/{coin}`](/api-reference/levels) and as `data.levels`
+(or the whole `data`, with `?view=levels`) in
+[GEX by Strike](/api-reference/by-strike-enhanced).
+
+Rows marked **history (coming)** are identity columns of stored snapshots. They
+are not part of the live `levels` object today; the live equivalents are listed
+in the note under the table.
+
+| Field | Type | Description |
+|---|---|---|
+| `schema_version` | int | Format version, starts at 1. **History (coming)** |
+| `timestamp_utc` | ISO 8601 `Z` | Capture time, aligned to :00/:15/:30/:45. **History (coming)**; live: `meta.as_of` |
+| `session_date` | date | UTC date (crypto) or US trading date (TradFi). **History (coming)** |
+| `type` | `intraday` \| `close` | `close` = last capture of the session date. **History (coming)** |
+| `exchange` | string | `bybit`, `deribit`, `okx`, `derive`, `combined`, `tradfi`. Live: `meta.exchange_resolved` |
+| `symbol` | string | `BTC`, `ETH`, …, `SPX`, `QQQ`, … Live: `meta.symbol` |
+| `expiration` | `TOTAL` \| date | `TOTAL` = all expirations captured at that moment (TradFi: ≤ 90 DTE). Live: returned in `data` of `/levels`, and as `meta.expiration` / `meta.expiration_iso` |
+| `dte` | number \| empty | Calendar days to expiration; empty for TOTAL. **History (coming)**; live: `expirations_detail[].dte` from [`/expirations`](/api-reference/expirations) |
+| `oi_date` | date | Session whose open interest is used. TradFi: OPRA OI settles once a day, so intraday rows use the previous session's OI. Crypto: live OI, equals `session_date`. **History (coming)**; live: `meta.oi_as_of` |
+| `spot` | number | Underlying price at capture |
+| `flip` | number \| empty | Primary gamma-flip price (`flip_points[0]`): the net-gamma sign change between V and S that is nearest to spot; if none lies in that bracket, the crossing nearest to spot. Empty when the profile has no crossing |
+| `flip_count` | int | Number of zero crossings in the profile |
+| `regime` | `positive` \| `negative` \| empty | `positive` if `spot ≥ flip` |
+| `net_gex` | number | Σ call_gex − Σ put_gex |
+| `abs_gex` | number | Σ call_gex + Σ put_gex |
+| `call_gex`, `put_gex` | number | Σ over strikes |
+| `call_oi_total`, `put_oi_total` | number \| empty | Σ open interest in contracts over all strikes (empty when open interest is not available) |
+| `p1_strike`, `p1_gex`, `p2_strike`, `p2_gex` | number | Strikes with the largest positive net GEX |
+| `n1_strike`, `n1_gex`, `n2_strike`, `n2_gex` | number | Strikes with the most negative net GEX |
+| `a1_strike`, `a1_gex`, `a2_strike`, `a2_gex` | number | Strikes with the largest absolute GEX (call + put) |
+| `s_price`, `s_gex` | number \| empty | Max-stability level: peak of the net-gamma profile (a price, not a strike) |
+| `v_price`, `v_gex` | number \| empty | Max-volatility level: trough of the net-gamma profile |
+| `max_pain` | number \| empty | Per-expiration max-pain strike; **empty for TOTAL** (not meaningful across expirations) |
+| `atm_iv` | number \| empty | ATM implied volatility, decimal (0.18 = 18 %), when available |
+
+P/N/A levels are computed over the strike window the app uses for the chart.
+
+<Note>
+In the JSON API, "empty" is `null`. `/levels` additionally returns
+`expiration` (`TOTAL` or an expiration code such as `17OCT26`) and
+`expiration_iso` (`YYYY-MM-DD`, `null` for `TOTAL`) next to the fields above.
+</Note>
+
+## Per-strike fields
+
+Per-strike data comes from [GEX by Strike](/api-reference/by-strike-enhanced) as
+parallel arrays under `data.gex_data` (index `i` refers to the same strike across
+arrays). The column set below is the one the stored history will use.
+**History (coming)**.
+
+| Field | Type | Description |
+|---|---|---|
+| `strike` | number | Strike price |
+| `call_gex` | number ≥ 0 | GEX of calls at this strike |
+| `put_gex` | number ≥ 0 | GEX of puts at this strike |
+| `net_gex` | number | `call_gex − put_gex` |
+| `call_oi`, `put_oi` | number \| empty | Open interest in contracts |
+
+## Known gaps
+
+- **Volume** is not captured; there are no volume fields.
+- Venue subsets (for example `deribit+derive`) are served live. They are not part of the stored history: per-strike GEX can be summed client-side from single-venue data, but the gamma flip cannot.

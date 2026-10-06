@@ -1,6 +1,6 @@
 ---
 title: 'Authentication'
-description: 'API keys, tiers, and security'
+description: 'API keys, access, and security'
 ---
 
 ## API Key format
@@ -30,20 +30,30 @@ The API also accepts `Authorization: Bearer <jwt>` for browser-based dashboard
 testing, but API keys are the recommended method for bots and scripts.
 </Info>
 
-## Tiers and quotas
+## Access and quotas
 
-| Tier | Price | Daily quota | Max keys |
-|------|-------|-------------|----------|
-| `trial` | Free (14 days) | 50 req/day | 1 |
-| `pro` | €35/month | 500 req/day | 5 |
+API access is a **plan entitlement** (`api_access`), not a tier name. Accounts
+without it get `403 subscription_required`. The trial includes API access.
 
-The `premium` tier (€15/month) has **no API access** — it's dashboard-only.
-[Upgrade to Pro](https://gammaflip.io/subscribe?plan=pro) for API access.
+| Plan | Daily quota | Max keys |
+|------|-------------|----------|
+| Trial (14 days) | 50 req/day | 1 |
+| Other plans with API access | 500 req/day | 5 |
 
-### Tier information in responses
+Each plan also lists the **markets** it includes (`crypto`, `tradfi`). A request
+for a coin from a market your plan does not include returns
+`403 market_not_in_plan`. See [Plans](https://gammaflip.io/subscribe) for what each
+plan includes.
 
-The authenticated tier isn't returned in the response body, but you can infer
-your quota from the `X-RateLimit-Limit` header.
+### Checking your own access
+
+Call the free [`GET /me`](/api-reference/me) to see your tier, markets,
+`api_access` and today's quota. It does not count against the quota.
+
+```bash
+curl https://api.gammaflip.io/api/v1/me \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
 
 ## Managing keys
 

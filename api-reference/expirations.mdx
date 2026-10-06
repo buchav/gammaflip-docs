@@ -1,25 +1,40 @@
 ---
 title: 'List Expirations'
 api: 'GET /expirations/{exchange}/{coin}'
-description: 'Returns sorted, non-expired option expiration dates'
+description: 'Returns sorted, non-expired option expirations with ISO date, DTE and cutoff. Free: not counted against the quota'
 ---
 
 ## Path parameters
 
 <ParamField path="exchange" type="string" required>
-  Exchange name: `bybit`, `deribit`, `okx`, or `all` (cross-exchange union).
+  Crypto: `bybit`, `deribit`, `okx`, `derive`, `all` / `combined`, or a subset
+  such as `deribit+derive`. TradFi tickers: `tradfi` (`all` and `combined` are
+  aliases). See [Markets and exchanges](/markets-and-exchanges).
 </ParamField>
 
 <ParamField path="coin" type="string" required>
-  Base coin symbol (uppercase). Use `/coins` to see what's available.
+  Symbol, for example `BTC` or `QQQ`. Case-insensitive. Use `/coins` to see what's available.
 </ParamField>
 
 ## Response
 
 <ResponseField name="data.expirations" type="array">
   Array of expiration date strings in `DDMMMYY` format (e.g., `25APR26`),
-  sorted chronologically. Already-expired dates are filtered out (expiration
-  is 08:00 UTC with a 1-hour grace period).
+  sorted chronologically. Already-expired dates are filtered out. The cutoff is
+  08:00 UTC for crypto and 16:00 US Eastern for TradFi, each with a 1-hour grace
+  period.
+</ResponseField>
+
+<ResponseField name="data.expirations_detail" type="array">
+  One object per entry of `expirations`, in the same order:
+
+  - `code`: the `DDMMMYY` code
+  - `iso`: the expiration date as `YYYY-MM-DD`
+  - `dte`: days to the cutoff, as a decimal (two places)
+  - `cutoff_utc`: the cutoff instant, ISO 8601 UTC with `Z`
+  - `is_0dte`: `true` when the expiration is today (in the market's own time zone)
+
+  Path parameters elsewhere accept either the code or the ISO date.
 </ResponseField>
 
 <ResponseField name="meta.exchange" type="string">
@@ -30,10 +45,20 @@ description: 'Returns sorted, non-expired option expiration dates'
   The coin you queried (echoed back).
 </ResponseField>
 
+<ResponseField name="meta.exchange_resolved" type="string">
+  The canonical venue after aliasing, for example `tradfi` for `all/QQQ` or
+  `deribit+derive` for a subset.
+</ResponseField>
+
+<ResponseField name="meta.market" type="string">
+  `crypto` or `tradfi`.
+</ResponseField>
+
 ## Errors
 
-<ResponseField name="400 invalid_exchange" type="error">
-  Exchange name isn't recognized. Use `/exchanges` to list valid values.
+<ResponseField name="400 invalid_exchange / invalid_pair" type="error">
+  Exchange name isn't recognized, or it does not match the coin's market. The
+  body includes `valid_exchanges`.
 </ResponseField>
 
 <RequestExample>
@@ -68,17 +93,18 @@ for exp in resp.json()["data"]["expirations"]:
       "09MAY26",
       "27JUN26",
       "26SEP26"
+    ],
+    "expirations_detail": [
+      { "code": "18APR26", "iso": "2026-04-18", "dte": 3.92, "cutoff_utc": "2026-04-18T08:00:00Z", "is_0dte": false },
+      { "code": "25APR26", "iso": "2026-04-25", "dte": 10.92, "cutoff_utc": "2026-04-25T08:00:00Z", "is_0dte": false }
     ]
   },
   "meta": {
     "timestamp": "2026-04-14T10:00:00+00:00",
     "exchange": "all",
     "coin": "BTC",
-    "rate_limit": {
-      "limit": 500,
-      "remaining": 497,
-      "reset": "2026-04-15T00:00:00+00:00"
-    }
+    "exchange_resolved": "combined",
+    "market": "crypto"
   }
 }
 ```
@@ -86,7 +112,8 @@ for exp in resp.json()["data"]["expirations"]:
 ```json 400 Bad Request
 {
   "error": "invalid_exchange",
-  "message": "Exchange \"kraken\" is not available."
+  "message": "Exchange 'kraken' is not available.",
+  "valid_exchanges": ["deribit", "bybit", "okx", "derive", "combined"]
 }
 ```
 

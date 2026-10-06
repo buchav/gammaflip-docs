@@ -22,6 +22,13 @@
               "rate-limits",
               "errors"
             ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "markets-and-exchanges",
+              "data-dictionary"
+            ]
           }
         ]
       },
@@ -33,7 +40,9 @@
             "pages": [
               "api-reference/exchanges",
               "api-reference/coins",
+              "api-reference/me",
               "api-reference/expirations",
+              "api-reference/levels",
               "api-reference/term-oi",
               "api-reference/by-strike-enhanced"
             ]

@@ -1,13 +1,14 @@
 ---
 title: 'Introduction'
-description: 'Programmatic access to Gamma Exposure (GEX) data for crypto options'
+description: 'Programmatic access to Gamma Exposure (GEX) data for crypto and US options'
 ---
 
 ## What is the GammaFlip API?
 
 The GammaFlip API gives you programmatic access to the same Gamma Exposure (GEX)
-data that powers [gammaflip.io](https://gammaflip.io). Build trading bots or
-integrate GEX signals into your research and workflow.
+data that powers [gammaflip.io](https://gammaflip.io), for crypto options
+(Bybit, Deribit, OKX, Derive) and US options (SPX, QQQ, SPY and more). Build
+trading bots or integrate GEX signals into your research and workflow.
 
 ## Who is this for?
 
@@ -26,21 +27,25 @@ integrate GEX signals into your research and workflow.
   </Card>
 </CardGroup>
 
-## Pricing and limits
+## Access and limits
 
-| Tier | Price | API quota | API keys |
-|------|-------|-----------|----------|
-| Trial | Free (14 days) | 50 req/day | 1 |
-| Pro | €35/month | 500 req/day | 5 |
-
-API access is **not** included in the €15/month Premium plan.
-[Upgrade to Pro](https://gammaflip.io/subscribe?plan=pro) to get API keys.
+API access is a plan entitlement. The 14-day trial includes it (50 requests/day);
+other plans with API access get 500 requests/day and up to 5 keys. Each plan
+covers the `crypto` market, the `tradfi` market, or both. Discovery endpoints and
+[`/me`](/api-reference/me) are free and not counted.
+See [Rate limits](/rate-limits) and [Authentication](/authentication), or
+[get access](https://gammaflip.io/subscribe).
 
 ## What you can do
 
-- Query GEX data by strike, by expiration, or aggregated across all exchanges
+- Get the key levels (flip, regime, walls, totals) for a symbol in one small call
+- Query GEX data by strike, by expiration, or aggregated across venues
 - List available exchanges, coins, and expiration dates
-- Build on Bybit, Deribit, and OKX data — separately or combined
+- Use crypto venues (Bybit, Deribit, OKX, Derive) separately, combined, or as a subset like `deribit+derive`
+- Query US tickers such as `SPX` and `QQQ` under the `tradfi` exchange
+- Know how fresh every response is: `as_of`, `oi_as_of` and more in `meta`
+
+See [Markets and exchanges](/markets-and-exchanges) and the [data dictionary](/data-dictionary).
 
 ## Next steps
 
@@ -50,5 +55,8 @@ API access is **not** included in the €15/month Premium plan.
   </Card>
   <Card title="API Reference" icon="book" href="/api-reference/exchanges">
     Full reference for all endpoints and schemas.
+  </Card>
+  <Card title="Data dictionary" icon="table" href="/data-dictionary">
+    Units, sign convention and every field in the levels object.
   </Card>
 </CardGroup>
