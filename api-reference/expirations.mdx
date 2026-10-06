@@ -61,6 +61,10 @@ description: 'Returns sorted, non-expired option expirations with ISO date, DTE 
   body includes `valid_exchanges`.
 </ResponseField>
 
+<ResponseField name="503 market_unavailable" type="error">
+  TradFi data is temporarily unavailable. Retry after a short delay.
+</ResponseField>
+
 <RequestExample>
 
 ```bash cURL

@@ -117,7 +117,9 @@ ticker, or `tradfi` with a crypto coin.
 }
 ```
 
-The expiration isn't one of the live expirations. Use `TOTAL`, or pick one from
+The expiration isn't one of the live expirations. `nearest_expirations` holds up
+to five ISO dates closest to the one you sent (the earliest five if the value is
+not a date). Use `TOTAL`, or pick one from
 `nearest_expirations` or [`/expirations`](/api-reference/expirations).
 
 ### `invalid_param` (400)
@@ -155,7 +157,7 @@ The data source for the market is down. Retry after a short delay.
 ### `rate_limit_exceeded` (429)
 
 ```json
-{ "error": "rate_limit_exceeded", "message": "Daily limit of 500 reached." }
+{ "error": "rate_limit_exceeded", "message": "Daily limit of 500 requests reached." }
 ```
 
 There is no `Retry-After` header. Use the `X-RateLimit-Reset` header or the free

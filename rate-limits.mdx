@@ -24,7 +24,8 @@ name: any plan that includes it can use the API. The quota depends on the plan:
 | `/me` | **Free** |
 
 Discovery and [`/me`](/api-reference/me) are free so clients and agents don't burn
-quota finding out what exists or how much is left. Requests that fail
+quota finding out what exists or how much is left. A counted endpoint
+uses one request even when it answers `400` or `404`; requests that fail
 authentication or entitlement checks (`401`, `403`) are not counted.
 
 ## Rate limit headers

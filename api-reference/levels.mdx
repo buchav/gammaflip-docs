@@ -61,7 +61,7 @@ units and sign convention are in the [data dictionary](/data-dictionary).
 </ResponseField>
 
 <ResponseField name="400 invalid_expiration" type="error">
-  The expiration is not listed. The body includes `nearest_expirations`.
+  The expiration is not listed. The body includes `nearest_expirations` (up to five ISO dates closest to the one you sent, or the earliest five if the value is not a date).
 </ResponseField>
 
 <ResponseField name="403 market_not_in_plan" type="error">

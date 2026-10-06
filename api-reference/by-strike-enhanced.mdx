@@ -170,7 +170,7 @@ quota (this call counts as 1 request).
 
 <ResponseField name="400 invalid_expiration" type="error">
   The expiration is not listed. The body includes `nearest_expirations`
-  (up to five ISO dates closest to the one you sent).
+  (up to five ISO dates closest to the one you sent, or the earliest five if the value is not a date).
 </ResponseField>
 
 <ResponseField name="400 invalid_param" type="error">
@@ -262,6 +262,14 @@ console.log("Strikes returned:", data.gex_data.strikes.length);
       "expiration_date": "25APR26",
       "current_price": 71800,
       "timestamp": "2026-04-14T10:00:00Z"
+    },
+    "levels": {
+      "spot": 71800, "flip": 71500, "flip_count": 1, "regime": "positive",
+      "net_gex": 32500000, "abs_gex": 75500000,
+      "call_gex": 54000000, "put_gex": 21500000,
+      "p1_strike": 72000, "p1_gex": 45000000,
+      "n1_strike": 70000, "n1_gex": -12500000,
+      "max_pain": 72000
     }
   },
   "meta": {
@@ -293,7 +301,7 @@ console.log("Strikes returned:", data.gex_data.strikes.length);
 ```json 404 Not Found
 {
   "error": "no_data",
-  "message": "No data available for BTC."
+  "message": "No data available for BTC 25APR26 on all."
 }
 ```
 

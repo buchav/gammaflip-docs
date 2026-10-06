@@ -234,7 +234,7 @@ components:
         nearest_expirations:
           type: array
           items: { type: string }
-          description: With `invalid_expiration`; up to five ISO dates closest to the request.
+          description: With `invalid_expiration`; up to five ISO dates closest to the request (the earliest five if the value is not a date).
           example: ["2026-10-17", "2026-10-19"]
         valid_values:
           type: array
@@ -491,6 +491,11 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '503':
+          description: TradFi data temporarily unavailable (`market_unavailable`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /levels/{exchange}/{coin}:
     get:

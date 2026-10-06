@@ -18,9 +18,9 @@ Every response repeats the unit string in `meta.units`
 ## Levels fields
 
 These fields describe one GEX snapshot. They are returned by
-[`GET /levels/{exchange}/{coin}`](/api-reference/levels) and as `data.levels`
-(or the whole `data`, with `?view=levels`) in
-[GEX by Strike](/api-reference/by-strike-enhanced).
+[`GET /levels/{exchange}/{coin}`](/api-reference/levels) (as the whole `data`
+object) and as `data.levels` in [GEX by Strike](/api-reference/by-strike-enhanced)
+(both `view=full` and `view=levels`).
 
 Rows marked **history (coming)** are identity columns of stored snapshots. They
 are not part of the live `levels` object today; the live equivalents are listed
