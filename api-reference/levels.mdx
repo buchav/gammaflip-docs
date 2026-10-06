@@ -35,6 +35,14 @@ units and sign convention are in the [data dictionary](/data-dictionary).
   ISO date such as `2026-10-17`. `max_pain` is `null` for `TOTAL`.
 </ParamField>
 
+<ParamField query="compare" type="string">
+  Comma-separated list of `1d`, `7d` and `30d`. Adds `data.compare`: for each period,
+  the last stored capture on or before the session date N days ago, with the deltas
+  to the live levels. Available for `TOTAL` only (otherwise `400 invalid_param`).
+  Venue subsets have no history and return `400 history_not_available`. See
+  [Compare with the past](#compare-with-the-past).
+</ParamField>
+
 ## Response
 
 <ResponseField name="data" type="object">
@@ -53,6 +61,39 @@ units and sign convention are in the [data dictionary](/data-dictionary).
   See [Response meta](/api-reference/by-strike-enhanced#response-meta).
 </ResponseField>
 
+## Compare with the past
+
+`?compare=1d,7d,30d` answers "what changed since" in one call. `data.compare` has
+one key per requested period. Each value is either `null` (no history that far
+back) or a history row with the fields of
+[`/history/levels`](/api-reference/history-levels) (`timestamp_utc`,
+`session_date`, `type`, `oi_date`, `spot`, `flip`, `regime`, ...) plus a `delta`
+object: the live value minus the past value for `spot`, `flip`, `net_gex`,
+`abs_gex`, `p1_strike`, `n1_strike`, `s_price` and `v_price` (`null` when either
+side is missing).
+
+- The reference date is today minus N days in the market's session calendar: the
+  UTC date for crypto, the **New York date** for TradFi. The row returned is the
+  last capture of the latest session on or before that date, so a weekend
+  reference gives Friday's close. Check its `session_date`.
+- `type` is `close` only when that session is complete.
+- If the history lookup fails the live levels are still returned, with every period `null`.
+
+```json
+"compare": {
+  "1d": {
+    "timestamp_utc": "2026-10-05T20:15:00Z", "session_date": "2026-10-05",
+    "type": "close", "oi_date": "2026-10-02", "spot": 751.2, "flip": 742.0,
+    "regime": "positive", "net_gex": 2100000000.0, "...": "...",
+    "delta": { "spot": 4.6, "flip": 2.59, "net_gex": 280000000.0, "abs_gex": 310000000.0,
+               "p1_strike": 0, "n1_strike": 0, "s_price": 0.0, "v_price": 0.0 }
+  },
+  "7d": null
+}
+```
+
+Illustrative values, shortened. It does not add to the request cost: still 1 request.
+
 ## Errors
 
 <ResponseField name="400 invalid_exchange / invalid_pair" type="error">
@@ -62,6 +103,11 @@ units and sign convention are in the [data dictionary](/data-dictionary).
 
 <ResponseField name="400 invalid_expiration" type="error">
   The expiration is not listed. The body includes `nearest_expirations` (up to five ISO dates closest to the one you sent, or the earliest five if the value is not a date).
+</ResponseField>
+
+<ResponseField name="400 invalid_param / history_not_available" type="error">
+  With `compare`: a period other than `1d`, `7d`, `30d` (`valid_values`), a
+  single expiration instead of `TOTAL`, or a venue subset (`valid_exchanges`).
 </ResponseField>
 
 <ResponseField name="403 market_not_in_plan" type="error">

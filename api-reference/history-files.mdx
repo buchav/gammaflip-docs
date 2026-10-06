@@ -1,0 +1,235 @@
+---
+title: 'History: Files'
+api: 'GET /history/files/{exchange}/{coin}'
+description: 'List and download daily CSV files with the full stored history'
+---
+
+## What it is
+
+For every symbol and completed session there are three gzip-compressed CSV files,
+built once the session is complete. They hold the full stored history, including
+every expiration and every strike, and are meant for backtests, spreadsheets and
+data pipelines. Two endpoints:
+
+| Endpoint | Returns | Cost |
+|----------|---------|------|
+| `GET /history/files/{exchange}/{coin}` | JSON list of the available files (manifest) | 1 request |
+| `GET /history/files/{exchange}/{coin}/{date}/{file}` | `302` redirect to the file | 1 **file credit** |
+
+Column layouts are in the [data dictionary](/data-dictionary#daily-history-files).
+
+| `file` | One row per | Use it for |
+|--------|-------------|-----------|
+| `levels` | capture x expiration (including `TOTAL`) | Levels of every expiration over a day |
+| `strikes_total` | capture x strike, `TOTAL` only, with the snapshot fields repeated on each row | The easiest file for strike-level backtests |
+| `strikes_by_expiry` | capture x expiration x strike | Per-expiration strike detail. Join to `levels` on `timestamp_utc` + `expiration` |
+
+## List files
+
+`GET /history/files/{exchange}/{coin}` costs **1 request**.
+
+<ParamField path="exchange" type="string" required>
+  `bybit`, `deribit`, `okx`, `derive`, `combined` or `tradfi`. Venue subsets return
+  `400 history_not_available`.
+</ParamField>
+
+<ParamField path="coin" type="string" required>
+  Symbol, for example `BTC`, `QQQ`. Case-insensitive.
+</ParamField>
+
+<ParamField query="start" type="string">
+  First session date, `YYYY-MM-DD`, inclusive. Default: the earliest.
+</ParamField>
+
+<ParamField query="end" type="string">
+  Last session date, `YYYY-MM-DD`, **exclusive**. Default: the latest.
+</ParamField>
+
+<ResponseField name="data" type="array">
+  Newest session first, at most **400 rows**. Use `start` / `end` to page through
+  longer ranges. Each row: `session_date`, `file` (`levels`, `strikes_total` or
+  `strikes_by_expiry`), `rows`, `bytes`, `sha256` (of the gzip file) and
+  `schema_version`.
+</ResponseField>
+
+## Download a file
+
+`GET /history/files/{exchange}/{coin}/{date}/{file}` answers **`302 Found`** with a
+`Location` header: a presigned link to the file that is valid for up to 15
+minutes. Request the link again whenever you need it.
+
+<ParamField path="date" type="string" required>
+  Session date, `YYYY-MM-DD`.
+</ParamField>
+
+<ParamField path="file" type="string" required>
+  `levels`, `strikes_total` or `strikes_by_expiry`.
+</ParamField>
+
+The file is served as `application/gzip` and downloads as
+`<date>_<file>.csv.gz`, for example `2026-10-05_strikes_total.csv.gz`.
+
+<Warning>
+The presigned link is self-authenticating. **Fetch it without your `X-API-Key`
+header.** Most HTTP clients, `curl -L` included, forward custom headers to the
+redirect target, so follow the redirect in two steps as shown below.
+</Warning>
+
+### Credits
+
+A successful download costs **one file credit** from the separate `history_files`
+daily bucket, not a request. A `400`, `404` or `503` never costs a credit, because
+the input and the file are checked first. The manifest listing is not a download:
+it costs a normal request. Limits and headers are in
+[Rate limits](/rate-limits#history-file-credits); see your balance in
+[`/me`](/api-reference/me).
+
+The `302` and the `429` carry:
+
+| Header | Meaning |
+|--------|---------|
+| `X-History-Files-Limit` | Your daily file credits (`0` = unlimited) |
+| `X-History-Files-Remaining` | Credits left until reset |
+| `X-History-Files-Reset` | When the bucket resets (ISO 8601, UTC) |
+
+No `Retry-After` header is sent; read `X-History-Files-Reset`.
+
+## Errors
+
+<ResponseField name="404 no_file" type="error">
+  No such file for that exchange, symbol, date and kind: the date is outside
+  coverage or not built yet. Check the manifest or
+  [`/history/coverage`](/api-reference/history-coverage). Costs no credit.
+</ResponseField>
+
+<ResponseField name="429 history_files_limit_exceeded" type="error">
+  The daily file credits are used up. The body repeats the figures under
+  `rate_limit`, and the `X-History-Files-*` headers are set.
+</ResponseField>
+
+<ResponseField name="503 files_unavailable" type="error">
+  File storage is temporarily unavailable. Retry later. Costs no credit.
+</ResponseField>
+
+<ResponseField name="400 invalid_param" type="error">
+  `file` is not one of the three kinds (the body includes `valid_values`), or a
+  date is not `YYYY-MM-DD`.
+</ResponseField>
+
+<ResponseField name="400 history_not_available" type="error">
+  Venue subset. The body includes `valid_exchanges`.
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+# 1. List what exists
+curl "https://api.gammaflip.io/api/v1/history/files/tradfi/QQQ?start=2026-10-01" \
+  -H "X-API-Key: gex_sk_your_key_here"
+
+# 2. Ask for the file: the response is a 302, the link is in redirect_url
+URL=$(curl -s -o /dev/null -w '%{redirect_url}' \
+  -H "X-API-Key: gex_sk_your_key_here" \
+  "https://api.gammaflip.io/api/v1/history/files/tradfi/QQQ/2026-10-05/strikes_total")
+
+# 3. Download from the link, without your API key
+curl -sS -o 2026-10-05_strikes_total.csv.gz "$URL"
+```
+
+```python Python
+import pandas as pd
+import requests
+
+BASE = "https://api.gammaflip.io/api/v1/history/files"
+H = {"X-API-Key": "gex_sk_your_key_here"}
+
+# Do not follow the redirect automatically: that would send the API key to storage.
+r = requests.get(f"{BASE}/tradfi/QQQ/2026-10-05/strikes_total",
+                 headers=H, allow_redirects=False)
+if r.status_code != 302:
+    raise RuntimeError(r.json())
+url = r.headers["Location"]
+
+# The link has a query string, so pandas cannot infer the compression: say it.
+df = pd.read_csv(url, compression="gzip")
+print(df[["timestamp_utc", "strike", "strike_call_gex", "strike_put_gex"]].head())
+```
+
+```python Python (levels, a range of days)
+import pandas as pd
+import requests
+
+BASE = "https://api.gammaflip.io/api/v1/history/files/tradfi/QQQ"
+H = {"X-API-Key": "gex_sk_your_key_here"}
+
+manifest = requests.get(BASE, headers=H, params={"start": "2026-09-01"}).json()["data"]
+days = sorted({m["session_date"] for m in manifest if m["file"] == "levels"})
+
+frames = []
+for day in days:
+    r = requests.get(f"{BASE}/{day}/levels", headers=H, allow_redirects=False)
+    if r.status_code == 429:
+        break                      # out of file credits: resume after X-History-Files-Reset
+    frames.append(pd.read_csv(r.headers["Location"], compression="gzip"))
+
+levels = pd.concat(frames, ignore_index=True)
+total = levels[levels["expiration"] == "TOTAL"]
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK (manifest)
+{
+  "data": [
+    { "session_date": "2026-10-05", "file": "levels", "rows": 1240,
+      "bytes": 61234, "sha256": "9f2c...e1", "schema_version": 1 },
+    { "session_date": "2026-10-05", "file": "strikes_total", "rows": 2700,
+      "bytes": 148112, "sha256": "41ab...07", "schema_version": 1 },
+    { "session_date": "2026-10-05", "file": "strikes_by_expiry", "rows": 64000,
+      "bytes": 2210044, "sha256": "c07d...3a", "schema_version": 1 }
+  ],
+  "meta": {
+    "timestamp": "2026-10-06T10:00:00.000000+00:00",
+    "exchange": "tradfi",
+    "coin": "QQQ",
+    "symbol": "QQQ",
+    "exchange_resolved": "tradfi",
+    "market": "tradfi",
+    "units": "USD per 1% move of the underlying",
+    "docs_url": "https://docs.gammaflip.io/data-dictionary",
+    "rate_limit": { "limit": 500, "remaining": 494, "reset": "2026-10-07T00:00:00+00:00" }
+  }
+}
+```
+
+```http 302 Found (download)
+HTTP/1.1 302 Found
+Location: https://...presigned-link...
+X-History-Files-Limit: 200
+X-History-Files-Remaining: 199
+X-History-Files-Reset: 2026-10-07T00:00:00+00:00
+```
+
+```json 429 Too Many Requests
+{
+  "error": "history_files_limit_exceeded",
+  "message": "Daily limit of 200 history files reached.",
+  "rate_limit": { "limit": 200, "remaining": 0, "reset": "2026-10-07T00:00:00+00:00" }
+}
+```
+
+```json 404 Not Found
+{
+  "error": "no_file",
+  "message": "No strikes_total file for QQQ on 2026-10-04."
+}
+```
+
+</ResponseExample>
+
+<Note>
+The values above are illustrative. Verify a download against the manifest's
+`sha256` and `bytes` if you need to.
+</Note>

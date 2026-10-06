@@ -1,0 +1,93 @@
+---
+title: 'History: Timestamps'
+api: 'GET /history/timestamps/{exchange}/{coin}'
+description: 'Capture timestamps of one session date'
+---
+
+## What it returns
+
+The capture times (ISO 8601 UTC) available for one session date, oldest first.
+Use it to pick an exact `at` for [`/history/snapshot`](/api-reference/history-snapshot).
+The session date is the UTC date for crypto and the America/New_York trading date
+for TradFi (see [Historical data](/history#session-date)).
+
+Costs **1 request** against your [daily quota](/rate-limits).
+
+## Path parameters
+
+<ParamField path="exchange" type="string" required>
+  `bybit`, `deribit`, `okx`, `derive`, `combined` or `tradfi`. Venue subsets return
+  `400 history_not_available`.
+</ParamField>
+
+<ParamField path="coin" type="string" required>
+  Symbol, for example `BTC`, `QQQ`. Case-insensitive.
+</ParamField>
+
+## Query parameters
+
+<ParamField query="date" type="string" required>
+  Session date, `YYYY-MM-DD` (years 2020 to 2100).
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="array">
+  Capture timestamps of that session date, for example `"2026-10-05T13:30:00Z"`.
+  Empty when there is no history for the date.
+</ResponseField>
+
+<ResponseField name="meta" type="object">
+  `exchange`, `coin`, `symbol`, `exchange_resolved`, `market`, `units`,
+  `docs_url`, `session_date` and your `rate_limit`.
+</ResponseField>
+
+## Errors
+
+<ResponseField name="400 invalid_param" type="error">
+  `date` is missing, not `YYYY-MM-DD`, or outside 2020 to 2100.
+</ResponseField>
+
+<ResponseField name="400 history_not_available" type="error">
+  Venue subset. The body includes `valid_exchanges`.
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl "https://api.gammaflip.io/api/v1/history/timestamps/tradfi/QQQ?date=2026-10-05" \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "data": [
+    "2026-10-05T13:30:00Z",
+    "2026-10-05T13:45:00Z",
+    "2026-10-05T14:00:00Z",
+    "2026-10-05T20:15:00Z"
+  ],
+  "meta": {
+    "timestamp": "2026-10-06T10:00:00.000000+00:00",
+    "exchange": "tradfi",
+    "coin": "QQQ",
+    "symbol": "QQQ",
+    "exchange_resolved": "tradfi",
+    "market": "tradfi",
+    "units": "USD per 1% move of the underlying",
+    "docs_url": "https://docs.gammaflip.io/data-dictionary",
+    "session_date": "2026-10-05",
+    "rate_limit": { "limit": 500, "remaining": 496, "reset": "2026-10-07T00:00:00+00:00" }
+  }
+}
+```
+
+</ResponseExample>
+
+<Note>
+The values above are illustrative and shortened.
+</Note>

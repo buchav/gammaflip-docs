@@ -19,10 +19,12 @@ let a client or an agent correct itself:
 
 | Hint field | Returned with |
 |------------|---------------|
-| `valid_exchanges` | `invalid_exchange`, `invalid_pair` |
+| `valid_exchanges` | `invalid_exchange`, `invalid_pair`, `history_not_available` |
 | `nearest_expirations` | `invalid_expiration` |
-| `valid_values` | `invalid_param` (for `view`) |
+| `valid_values` | `invalid_param` (for `view`, `granularity`, `file`, `compare`) |
 | `max_value` | `invalid_param` (for `range_pct`) |
+| `max_window_days` | `range_too_large` |
+| `nearest_timestamps` | `no_snapshot` |
 | `markets_in_plan` | `market_not_in_plan` |
 
 ## HTTP status codes
@@ -33,10 +35,10 @@ let a client or an agent correct itself:
 | `400` | Bad Request | Invalid exchange, pair, expiration or parameter |
 | `401` | Unauthorized | Missing or invalid API key |
 | `403` | Forbidden | Plan has no API access, or doesn't include the market |
-| `404` | Not Found | No data available for this coin/exchange/expiration |
-| `429` | Too Many Requests | Daily quota exceeded — see [rate limits](/rate-limits) |
+| `404` | Not Found | No data available for this coin/exchange/expiration, or no history snapshot or file |
+| `429` | Too Many Requests | Daily request quota or daily history file credits exceeded — see [rate limits](/rate-limits) |
 | `500` | Server Error | Something went wrong on our side — retry or contact support |
-| `503` | Service Unavailable | A data source (for example TradFi) is temporarily unavailable — retry later |
+| `503` | Service Unavailable | A data source (for example TradFi) or history file storage is temporarily unavailable — retry later |
 
 ## Error codes
 
@@ -133,7 +135,11 @@ not a date). Use `TOTAL`, or pick one from
 ```
 
 A query parameter is invalid: `view` must be `full` or `levels`
-(`valid_values`), and `range_pct` must be in (0, 50] (`max_value`).
+(`valid_values`), and `range_pct` must be in (0, 50] (`max_value`). On the history
+endpoints it also covers an unparseable `start`, `end`, `at`, `date` or `cursor`,
+`start` after `end`, a year outside 2020 to 2100, an unknown `granularity` or
+`file` (`valid_values`), and `?compare=` other than `1d`, `7d`, `30d` or used
+with a single expiration.
 
 ### `no_data` (404)
 
@@ -163,6 +169,83 @@ The data source for the market is down. Retry after a short delay.
 There is no `Retry-After` header. Use the `X-RateLimit-Reset` header or the free
 [`/me`](/api-reference/me) to find out when the quota resets. See
 [Rate Limits](/rate-limits) for handling strategies.
+
+### History errors
+
+The [history endpoints](/history) add these slugs.
+
+#### `history_not_available` (400)
+
+```json
+{
+  "error": "history_not_available",
+  "message": "History is kept per exchange and for 'combined', not for subsets.",
+  "valid_exchanges": ["bybit", "deribit", "okx", "derive", "combined"]
+}
+```
+
+Venue subsets such as `deribit+derive` have no history. Use one venue or
+`combined`. The same applies to `?compare=` on [`/levels`](/api-reference/levels).
+
+#### `range_too_large` (400)
+
+```json
+{
+  "error": "range_too_large",
+  "message": "granularity 15m allows at most 31 days.",
+  "max_window_days": 31
+}
+```
+
+The window of [`/history/levels`](/api-reference/history-levels) is longer than
+the granularity allows: `15m` up to 31 days, `1h` up to 180 days, `close`
+unlimited. Shorten the window or use a coarser granularity.
+
+#### `no_snapshot` (404)
+
+```json
+{
+  "error": "no_snapshot",
+  "message": "No capture within 15 minutes of 'at'.",
+  "nearest_timestamps": ["2026-10-05T20:15:00Z", "2026-10-05T13:45:00Z"]
+}
+```
+
+[`/history/snapshot`](/api-reference/history-snapshot) found no capture within 15
+minutes of `at`. Retry with one of `nearest_timestamps` (up to three, from the
+`TOTAL` captures).
+
+#### `no_file` (404)
+
+```json
+{ "error": "no_file", "message": "No strikes_total file for QQQ on 2026-10-04." }
+```
+
+There is no daily file for that exchange, symbol, date and kind. The date is
+outside [coverage](/api-reference/history-coverage), or the session is not
+complete yet. No file credit is spent.
+
+#### `files_unavailable` (503)
+
+```json
+{ "error": "files_unavailable", "message": "History files are temporarily unavailable." }
+```
+
+File storage is down or not reachable. Retry later. No file credit is spent.
+
+#### `history_files_limit_exceeded` (429)
+
+```json
+{
+  "error": "history_files_limit_exceeded",
+  "message": "Daily limit of 200 history files reached.",
+  "rate_limit": { "limit": 200, "remaining": 0, "reset": "2026-10-07T00:00:00+00:00" }
+}
+```
+
+The daily file credits are used up (trial 20, other plans with API access 200).
+There is no `Retry-After` header; read `X-History-Files-Reset` or
+[`/me`](/api-reference/me). See [Rate limits](/rate-limits#history-file-credits).
 
 ## Getting help
 

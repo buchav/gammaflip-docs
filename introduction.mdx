@@ -44,6 +44,7 @@ See [Rate limits](/rate-limits) and [Authentication](/authentication), or
 - Use crypto venues (Bybit, Deribit, OKX, Derive) separately, combined, or as a subset like `deribit+derive`
 - Query US tickers such as `SPX` and `QQQ` under the `tradfi` exchange
 - Know how fresh every response is: `as_of`, `oi_as_of` and more in `meta`
+- Read the stored history: levels over time, per-strike snapshots and daily CSV files for backtests. See [Historical data](/history)
 
 See [Markets and exchanges](/markets-and-exchanges) and the [data dictionary](/data-dictionary).
 
@@ -55,6 +56,9 @@ See [Markets and exchanges](/markets-and-exchanges) and the [data dictionary](/d
   </Card>
   <Card title="API Reference" icon="book" href="/api-reference/exchanges">
     Full reference for all endpoints and schemas.
+  </Card>
+  <Card title="Historical data" icon="clock-rotate-left" href="/history">
+    Levels time series, snapshots and daily bulk files.
   </Card>
   <Card title="Data dictionary" icon="table" href="/data-dictionary">
     Units, sign convention and every field in the levels object.

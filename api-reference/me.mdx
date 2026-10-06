@@ -45,6 +45,13 @@ This endpoint is **free**: it does not count against your quota.
   When the counter resets, ISO 8601, midnight UTC.
 </ResponseField>
 
+<ResponseField name="data.quota.history_files" type="object">
+  The separate daily bucket of [history file credits](/rate-limits#history-file-credits),
+  with the same `limit`, `used`, `remaining` and `reset` fields as
+  `quota.requests`. `limit` is 20 on the trial, 200 on other plans with API access
+  and `0` (unlimited) for admin accounts.
+</ResponseField>
+
 <RequestExample>
 
 ```bash cURL
@@ -78,6 +85,12 @@ print(f"{q['remaining']} of {q['limit']} requests left, resets {q['reset']}")
         "limit": 50,
         "used": 13,
         "remaining": 37,
+        "reset": "2026-10-07T00:00:00+00:00"
+      },
+      "history_files": {
+        "limit": 20,
+        "used": 2,
+        "remaining": 18,
         "reset": "2026-10-07T00:00:00+00:00"
       }
     }

@@ -58,6 +58,17 @@ Mixing the two sides is rejected with a hint:
 
 See [Errors](/errors) for the full catalog.
 
+## Historical data
+
+[History](/history) is stored per single venue (`bybit`, `deribit`, `okx`, `derive`),
+for `combined` (all crypto venues merged) and for `tradfi`. As for live data, `all`
+and `combined` with a TradFi ticker resolve to `tradfi`. **Venue subsets such as
+`deribit+derive` have no history** and return `400 history_not_available` with
+`valid_exchanges`.
+
+Session dates follow the market: the UTC date for crypto, the New York trading
+date for TradFi. See [Historical data](/history#session-date).
+
 ## Expiration cutoffs
 
 An expiration is listed until its settlement cutoff (plus a one-hour grace

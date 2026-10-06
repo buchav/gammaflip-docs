@@ -20,6 +20,10 @@ name: any plan that includes it can use the API. The quota depends on the plan:
 |----------|----------|
 | `/gex/term-oi/...`, `/gex/by-strike-enhanced/...` | Yes, 1 request each |
 | `/levels/...` | Yes, 1 request |
+| `/history/levels/...`, `/history/timestamps/...`, `/history/snapshot/...` | Yes, 1 request each |
+| `/history/files/{exchange}/{coin}` (the listing) | Yes, 1 request |
+| `/history/files/{exchange}/{coin}/{date}/{file}` (a download) | No request; costs **1 file credit** (see below) |
+| `/history/coverage` | **Free** |
 | `/exchanges`, `/coins`, `/expirations/...` | **Free** |
 | `/me` | **Free** |
 
@@ -28,9 +32,37 @@ quota finding out what exists or how much is left. A counted endpoint
 uses one request even when it answers `400` or `404`; requests that fail
 authentication or entitlement checks (`401`, `403`) are not counted.
 
+## History file credits
+
+Downloading a [daily history file](/api-reference/history-files) does not use your
+request quota. It uses a separate daily bucket of **file credits**, so a bulk
+download never eats the requests your bot needs:
+
+| Plan | File credits/day |
+|------|------------------|
+| Trial | 20 |
+| Other plans with API access | 200 |
+
+The bucket resets at midnight UTC, like the request quota. One successful download
+costs one credit; a `400`, `404` or `503` costs nothing. Responses to a download
+carry:
+
+```
+X-History-Files-Limit: 200
+X-History-Files-Remaining: 199
+X-History-Files-Reset: 2026-10-07T00:00:00+00:00
+```
+
+When the credits are gone the API answers `429 history_files_limit_exceeded`
+(again with no `Retry-After` header: read `X-History-Files-Reset`).
+[`/me`](/api-reference/me) shows both buckets in `quota.requests` and
+`quota.history_files`. For scale: 200 credits cover about 100 sessions of two
+files in one day.
+
 ## Rate limit headers
 
-Every **counted** response includes three headers (free endpoints don't):
+Every **counted** response includes three headers (free endpoints and file
+downloads don't; downloads carry the `X-History-Files-*` headers above):
 
 ```
 X-RateLimit-Limit: 500

@@ -8,9 +8,11 @@ info:
 
     API access is a plan entitlement (`api_access`). The trial includes it
     (50 requests/day); other plans with API access get 500 requests/day.
-    Only `/gex/...` and `/levels/...` count against the quota; `/exchanges`,
-    `/coins`, `/expirations/...` and `/me` are free. A `429` carries no
-    `Retry-After` header: use `X-RateLimit-Reset` or `/me`.
+    Only `/gex/...`, `/levels/...` and the `/history/...` query endpoints count
+    against the quota; `/exchanges`, `/coins`, `/expirations/...`, `/me` and
+    `/history/coverage` are free. History file downloads use a separate daily
+    bucket of file credits (trial 20, other plans 200). A `429` carries no
+    `Retry-After` header: use `X-RateLimit-Reset`, `X-History-Files-Reset` or `/me`.
 
     All GEX values are USD per 1% move of the underlying. Field definitions:
     https://docs.gammaflip.io/data-dictionary
@@ -174,6 +176,91 @@ components:
         cutoff_utc: { type: [string, 'null'], format: date-time, example: "2026-10-17T20:00:00Z" }
         is_0dte: { type: boolean }
 
+    HistoryLevelsRow:
+      type: object
+      description: |
+        One stored `TOTAL` snapshot. `type` is `close` only for the last capture of a
+        completed session. `oi_date` is the session whose open interest the row used.
+        The levels fields follow the `Levels` schema (`max_pain` is always `null` for `TOTAL`).
+      allOf:
+        - type: object
+          properties:
+            schema_version: { type: integer, example: 1 }
+            timestamp_utc: { type: string, format: date-time, example: "2026-10-05T20:15:00Z" }
+            session_date: { type: string, format: date, description: "UTC date (crypto) or New York trading date (TradFi).", example: "2026-10-05" }
+            type: { type: string, enum: [intraday, close] }
+            exchange: { type: string, example: "tradfi" }
+            symbol: { type: string, example: "QQQ" }
+            oi_date: { type: [string, 'null'], format: date, description: "Session whose open interest was used.", example: "2026-10-02" }
+        - $ref: '#/components/schemas/Levels'
+
+    HistoryStrike:
+      type: object
+      properties:
+        strike: { type: number, example: 760 }
+        call_gex: { type: [number, 'null'], description: "Non-negative." }
+        put_gex: { type: [number, 'null'], description: "Non-negative." }
+        net_gex: { type: [number, 'null'], description: "`call_gex - put_gex`." }
+        call_oi: { type: [number, 'null'], description: "Open interest in contracts." }
+        put_oi: { type: [number, 'null'] }
+
+    HistorySnapshot:
+      description: |
+        A stored snapshot: the snapshot-level fields (as `HistoryLevelsRow`, plus
+        `expiration` and `dte`) and the strikes within +/- 25% of spot.
+      allOf:
+        - $ref: '#/components/schemas/HistoryLevelsRow'
+        - type: object
+          properties:
+            expiration: { type: string, description: "`TOTAL` or an ISO date.", example: "TOTAL" }
+            dte: { type: [number, 'null'], description: "Calendar days to expiration; `null` for `TOTAL`." }
+            strikes:
+              type: array
+              items: { $ref: '#/components/schemas/HistoryStrike' }
+
+    HistoryCoverageRow:
+      type: object
+      properties:
+        exchange: { type: string, example: "tradfi" }
+        symbol: { type: string, example: "QQQ" }
+        first_ts: { type: string, format: date-time, example: "2026-05-04T13:30:00Z" }
+        last_ts: { type: string, format: date-time, example: "2026-10-06T09:45:00Z" }
+        sessions: { type: integer, example: 109 }
+        files_first_date: { type: [string, 'null'], format: date, example: "2026-05-04" }
+        files_last_date: { type: [string, 'null'], format: date, example: "2026-10-05" }
+
+    HistoryFileEntry:
+      type: object
+      properties:
+        session_date: { type: string, format: date, example: "2026-10-05" }
+        file:
+          type: string
+          enum: [levels, strikes_total, strikes_by_expiry]
+        rows: { type: integer, example: 2700 }
+        bytes: { type: integer, description: "Size of the gzip file.", example: 148112 }
+        sha256: { type: string, description: "SHA-256 of the gzip file." }
+        schema_version: { type: integer, example: 1 }
+
+    HistoryMeta:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time }
+        exchange: { type: string, description: "As requested (lowercased).", example: "tradfi" }
+        coin: { type: string, example: "QQQ" }
+        symbol: { type: string, example: "QQQ" }
+        exchange_resolved: { type: string, example: "tradfi" }
+        market: { type: string, enum: [crypto, tradfi] }
+        units: { type: string, example: "USD per 1% move of the underlying" }
+        docs_url: { type: string, example: "https://docs.gammaflip.io/data-dictionary" }
+        granularity: { type: string, enum: [15m, 1h, close], description: "`/history/levels` only." }
+        start: { type: string, format: date-time, description: "`/history/levels` only: the window start as applied." }
+        end: { type: string, format: date-time, description: "`/history/levels` only: the window end (exclusive) as applied." }
+        next_cursor: { type: [string, 'null'], description: "`/history/levels` only: pass as `cursor` for the next page; `null` on the last page." }
+        session_date: { type: string, format: date, description: "`/history/timestamps` only." }
+        snapshot_at: { type: string, format: date-time, description: "`/history/snapshot` only: the capture returned." }
+        rate_limit:
+          $ref: '#/components/schemas/RateLimit'
+
     Markets:
       type: object
       properties:
@@ -218,6 +305,12 @@ components:
             - invalid_param
             - no_data
             - market_unavailable
+            - history_not_available
+            - range_too_large
+            - no_snapshot
+            - no_file
+            - files_unavailable
+            - history_files_limit_exceeded
           example: "invalid_exchange"
         message:
           type: string
@@ -229,7 +322,7 @@ components:
         valid_exchanges:
           type: array
           items: { type: string }
-          description: With `invalid_exchange` and `invalid_pair`.
+          description: With `invalid_exchange`, `invalid_pair` and `history_not_available`.
           example: ["deribit", "bybit", "okx", "derive", "combined"]
         nearest_expirations:
           type: array
@@ -239,12 +332,21 @@ components:
         valid_values:
           type: array
           items: { type: string }
-          description: With `invalid_param` for `view`.
+          description: With `invalid_param` for `view`, `granularity`, `file` and `compare`.
           example: ["full", "levels"]
         max_value:
           type: number
           description: With `invalid_param` for `range_pct`.
           example: 50
+        max_window_days:
+          type: integer
+          description: With `range_too_large`.
+          example: 31
+        nearest_timestamps:
+          type: array
+          items: { type: string, format: date-time }
+          description: With `no_snapshot`; up to three capture times closest to `at`.
+          example: ["2026-10-05T20:15:00Z", "2026-10-05T13:45:00Z"]
         market:
           type: string
           description: With `market_not_in_plan`.
@@ -254,7 +356,7 @@ components:
           description: With `market_not_in_plan`.
         rate_limit:
           $ref: '#/components/schemas/RateLimit'
-          description: With `rate_limit_exceeded`.
+          description: With `rate_limit_exceeded` and `history_files_limit_exceeded`.
 
   parameters:
     Exchange:
@@ -276,6 +378,17 @@ components:
       schema:
         type: string
         example: "BTC"
+    HistoryExchange:
+      name: exchange
+      in: path
+      required: true
+      description: |
+        `bybit`, `deribit`, `okx`, `derive`, `combined` or `tradfi`. `all` and `combined`
+        with a TradFi ticker resolve to `tradfi`. Venue subsets such as `deribit+derive`
+        have no history: `400 history_not_available`.
+      schema:
+        type: string
+        examples: ["deribit", "combined", "tradfi"]
     View:
       name: view
       in: query
@@ -316,6 +429,13 @@ components:
       description: |
         `invalid_exchange`, `invalid_pair`, `invalid_expiration` or `invalid_param`,
         with hint fields (`valid_exchanges`, `nearest_expirations`, `valid_values`, `max_value`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    HistoryNotAvailable:
+      description: |
+        `invalid_exchange`, `invalid_pair`, `invalid_param`, `history_not_available`
+        (venue subset; with `valid_exchanges`) or `range_too_large` (with `max_window_days`).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -406,7 +526,8 @@ paths:
       operationId: getMe
       summary: Your plan, markets and quota
       description: |
-        Returns your tier, the markets your plan includes, `api_access`, and today's quota.
+        Returns your tier, the markets your plan includes, `api_access`, and today's quota
+        for both buckets (`requests` and `history_files`).
         **Free**: not counted against the quota. Use it to find out when the quota resets
         (a 429 carries no `Retry-After`).
       tags: [Discovery]
@@ -448,6 +569,26 @@ paths:
                                   remaining:
                                     type: [integer, 'null']
                                     example: 37
+                                  reset:
+                                    type: string
+                                    format: date-time
+                                    example: "2026-10-07T00:00:00+00:00"
+                              history_files:
+                                type: object
+                                description: |
+                                  Separate daily bucket for history file downloads
+                                  (trial 20, other plans with API access 200, admin unlimited).
+                                properties:
+                                  limit:
+                                    type: integer
+                                    description: Daily file credits; 0 means unlimited.
+                                    example: 20
+                                  used:
+                                    type: [integer, 'null']
+                                    example: 2
+                                  remaining:
+                                    type: [integer, 'null']
+                                    example: 18
                                   reset:
                                     type: string
                                     format: date-time
@@ -516,6 +657,17 @@ paths:
           schema:
             type: string
             default: TOTAL
+        - name: compare
+          in: query
+          required: false
+          description: |
+            Comma-separated `1d`, `7d`, `30d`. Adds `data.compare` with, for each period, the
+            last stored capture on or before the session date N days ago and its deltas to the
+            live levels. `TOTAL` only; venue subsets have no history. The reference date is
+            the New York date for TradFi and the UTC date for crypto.
+          schema:
+            type: string
+            example: "1d,7d,30d"
       responses:
         '200':
           description: Levels
@@ -535,6 +687,23 @@ paths:
                             example: "TOTAL"
                           expiration_iso:
                             type: [string, 'null']
+                          compare:
+                            type: object
+                            description: |
+                              Only with `?compare=`. One key per requested period; `null` when
+                              there is no history that far back. Each value is a history row plus
+                              `delta` (live minus past for `spot`, `flip`, `net_gex`, `abs_gex`,
+                              `p1_strike`, `n1_strike`, `s_price`, `v_price`; `null` when missing).
+                            additionalProperties:
+                              oneOf:
+                                - type: 'null'
+                                - allOf:
+                                    - $ref: '#/components/schemas/HistoryLevelsRow'
+                                    - type: object
+                                      properties:
+                                        delta:
+                                          type: object
+                                          additionalProperties: { type: [number, 'null'] }
                   meta:
                     $ref: '#/components/schemas/DataMeta'
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -649,6 +818,277 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
         '503':
           description: TradFi data temporarily unavailable (`market_unavailable`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /history/levels/{exchange}/{coin}:
+    get:
+      operationId: getHistoryLevels
+      summary: Levels time series
+      description: |
+        The `TOTAL` levels over a time window, oldest first: one row per capture (`15m`),
+        per UTC hour (`1h`) or per session (`close`). `start` is inclusive, `end` exclusive.
+        A response has at most 5,000 rows plus an opaque `meta.next_cursor`. Counts as 1 request.
+        See https://docs.gammaflip.io/history for session dates, the close definition and
+        point-in-time semantics.
+      tags: [History]
+      parameters:
+        - $ref: '#/components/parameters/HistoryExchange'
+        - $ref: '#/components/parameters/Coin'
+        - name: start
+          in: query
+          required: false
+          description: ISO date or datetime (UTC), inclusive. Default `end` minus 30 days. Years 2020 to 2100.
+          schema: { type: string, example: "2026-09-01" }
+        - name: end
+          in: query
+          required: false
+          description: ISO date or datetime (UTC), exclusive. Default now, floored to the 15-minute capture grid.
+          schema: { type: string, example: "2026-10-01" }
+        - name: granularity
+          in: query
+          required: false
+          description: |
+            `15m` (every capture, window up to 31 days), `1h` (last capture of each UTC hour,
+            up to 180 days) or `close` (last capture of each session, unlimited).
+          schema:
+            type: string
+            enum: [15m, 1h, close]
+            default: close
+        - name: cursor
+          in: query
+          required: false
+          description: The `meta.next_cursor` of the previous page. Repeat the other parameters.
+          schema: { type: string }
+      responses:
+        '200':
+          description: Levels rows
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/HistoryLevelsRow' }
+                  meta:
+                    $ref: '#/components/schemas/HistoryMeta'
+        '400': { $ref: '#/components/responses/HistoryNotAvailable' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /history/timestamps/{exchange}/{coin}:
+    get:
+      operationId: getHistoryTimestamps
+      summary: Capture timestamps of a session date
+      description: |
+        The capture times (ISO 8601 UTC) of one session date, oldest first. The session date
+        is the UTC date for crypto and the New York trading date for TradFi. Counts as 1 request.
+      tags: [History]
+      parameters:
+        - $ref: '#/components/parameters/HistoryExchange'
+        - $ref: '#/components/parameters/Coin'
+        - name: date
+          in: query
+          required: true
+          description: Session date, `YYYY-MM-DD`.
+          schema: { type: string, format: date, example: "2026-10-05" }
+      responses:
+        '200':
+          description: Capture timestamps
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { type: string, format: date-time }
+                  meta:
+                    $ref: '#/components/schemas/HistoryMeta'
+        '400': { $ref: '#/components/responses/HistoryNotAvailable' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /history/snapshot/{exchange}/{coin}:
+    get:
+      operationId: getHistorySnapshot
+      summary: Per-strike snapshot at a past moment
+      description: |
+        The stored snapshot nearest to `at` (within 15 minutes): snapshot-level fields and
+        the strikes within +/- 25% of spot. When nothing is that close the answer is
+        `404 no_snapshot` with `nearest_timestamps` from the `TOTAL` captures. Counts as 1 request.
+      tags: [History]
+      parameters:
+        - $ref: '#/components/parameters/HistoryExchange'
+        - $ref: '#/components/parameters/Coin'
+        - name: at
+          in: query
+          required: true
+          description: ISO datetime (UTC).
+          schema: { type: string, example: "2026-10-05T19:50:00Z" }
+        - name: expiration
+          in: query
+          required: false
+          description: "`TOTAL` (default) or an ISO expiration date `YYYY-MM-DD`."
+          schema: { type: string, default: TOTAL, example: "TOTAL" }
+      responses:
+        '200':
+          description: Snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/HistorySnapshot'
+                  meta:
+                    $ref: '#/components/schemas/HistoryMeta'
+        '400': { $ref: '#/components/responses/HistoryNotAvailable' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No capture within 15 minutes of `at` (`no_snapshot`, with `nearest_timestamps`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /history/coverage:
+    get:
+      operationId: getHistoryCoverage
+      summary: What history exists
+      description: |
+        Per exchange and symbol: first and last capture, number of sessions and the date range
+        of the daily files. **Free**: not counted against the quota. Cached for up to an hour.
+      tags: [History]
+      responses:
+        '200':
+          description: Coverage
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/HistoryCoverageRow' }
+                  meta:
+                    type: object
+                    properties:
+                      timestamp: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /history/files/{exchange}/{coin}:
+    get:
+      operationId: listHistoryFiles
+      summary: List daily history files
+      description: |
+        The manifest of daily CSV.gz files, newest first, at most 400 rows. Counts as 1 request.
+        Download a file with `/history/files/{exchange}/{coin}/{date}/{file}`.
+      tags: [History]
+      parameters:
+        - $ref: '#/components/parameters/HistoryExchange'
+        - $ref: '#/components/parameters/Coin'
+        - name: start
+          in: query
+          required: false
+          description: First session date, `YYYY-MM-DD`, inclusive.
+          schema: { type: string, format: date }
+        - name: end
+          in: query
+          required: false
+          description: Last session date, `YYYY-MM-DD`, exclusive.
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: File manifest
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/HistoryFileEntry' }
+                  meta:
+                    $ref: '#/components/schemas/HistoryMeta'
+        '400': { $ref: '#/components/responses/HistoryNotAvailable' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /history/files/{exchange}/{coin}/{date}/{file}:
+    get:
+      operationId: downloadHistoryFile
+      summary: Download a daily history file
+      description: |
+        Answers `302` with a presigned link, valid for up to 15 minutes, to a gzip-compressed
+        CSV (`application/gzip`, downloaded as `<date>_<file>.csv.gz`). Costs one **file credit**
+        from the separate `history_files` daily bucket, not a request. A 400, 404 or 503 costs
+        nothing. Follow the redirect without your `X-API-Key` header. Column layouts:
+        https://docs.gammaflip.io/data-dictionary#daily-history-files
+      tags: [History]
+      parameters:
+        - $ref: '#/components/parameters/HistoryExchange'
+        - $ref: '#/components/parameters/Coin'
+        - name: date
+          in: path
+          required: true
+          description: Session date, `YYYY-MM-DD`.
+          schema: { type: string, format: date, example: "2026-10-05" }
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [levels, strikes_total, strikes_by_expiry]
+      responses:
+        '302':
+          description: Redirect to the presigned file link.
+          headers:
+            Location:
+              description: Presigned link, valid for up to 15 minutes.
+              schema: { type: string, format: uri }
+            X-History-Files-Limit:
+              schema: { type: integer }
+            X-History-Files-Remaining:
+              schema: { type: integer }
+            X-History-Files-Reset:
+              schema: { type: string, format: date-time }
+        '400': { $ref: '#/components/responses/HistoryNotAvailable' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: No such file (`no_file`). Costs no credit.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: |
+            Daily file credits used up (`history_files_limit_exceeded`). No `Retry-After`
+            header: use `X-History-Files-Reset` or `GET /me`.
+          headers:
+            X-History-Files-Limit:
+              schema: { type: integer }
+            X-History-Files-Remaining:
+              schema: { type: integer, example: 0 }
+            X-History-Files-Reset:
+              schema: { type: string, format: date-time }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: File storage temporarily unavailable (`files_unavailable`). Costs no credit.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

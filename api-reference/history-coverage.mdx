@@ -1,0 +1,100 @@
+---
+title: 'History: Coverage'
+api: 'GET /history/coverage'
+description: 'What history exists for each exchange and symbol. Free: not counted against the quota'
+---
+
+## What it returns
+
+One row per exchange and symbol that has stored history: when it starts and ends,
+how many sessions it spans and which daily files are available. Use it before a
+backfill to see, for example, that a symbol's history starts in May instead of
+guessing.
+
+This endpoint is **free**: it does not count against your request quota. The
+result is cached for up to an hour.
+
+## Response
+
+<ResponseField name="data" type="array">
+  One object per `(exchange, symbol)`:
+
+  <Expandable title="fields">
+    <ResponseField name="exchange" type="string">
+      `bybit`, `deribit`, `okx`, `derive`, `combined` or `tradfi`.
+    </ResponseField>
+    <ResponseField name="symbol" type="string">
+      For example `BTC`, `QQQ`.
+    </ResponseField>
+    <ResponseField name="first_ts" type="string">
+      First stored capture, ISO 8601 UTC `Z`.
+    </ResponseField>
+    <ResponseField name="last_ts" type="string">
+      Latest stored capture, ISO 8601 UTC `Z`.
+    </ResponseField>
+    <ResponseField name="sessions" type="integer">
+      Number of distinct session dates with at least one capture.
+    </ResponseField>
+    <ResponseField name="files_first_date" type="string | null">
+      First session date with a [daily file](/api-reference/history-files);
+      `null` when no file has been built yet.
+    </ResponseField>
+    <ResponseField name="files_last_date" type="string | null">
+      Latest session date with a daily file; `null` when none.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.gammaflip.io/api/v1/history/coverage \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+```python Python
+import requests
+import pandas as pd
+
+resp = requests.get(
+    "https://api.gammaflip.io/api/v1/history/coverage",
+    headers={"X-API-Key": "gex_sk_your_key_here"},
+)
+print(pd.DataFrame(resp.json()["data"]))
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "data": [
+    {
+      "exchange": "deribit",
+      "symbol": "BTC",
+      "first_ts": "2026-05-01T00:00:00Z",
+      "last_ts": "2026-10-06T09:45:00Z",
+      "sessions": 159,
+      "files_first_date": "2026-05-01",
+      "files_last_date": "2026-10-05"
+    },
+    {
+      "exchange": "tradfi",
+      "symbol": "QQQ",
+      "first_ts": "2026-05-04T13:30:00Z",
+      "last_ts": "2026-10-06T09:45:00Z",
+      "sessions": 109,
+      "files_first_date": "2026-05-04",
+      "files_last_date": "2026-10-05"
+    }
+  ],
+  "meta": { "timestamp": "2026-10-06T10:00:00.000000+00:00" }
+}
+```
+
+</ResponseExample>
+
+<Note>
+The values above are illustrative.
+</Note>
