@@ -1,0 +1,215 @@
+---
+title: 'History: Levels'
+api: 'GET /history/levels/{exchange}/{coin}'
+description: 'Time series of the TOTAL levels: flip, regime, walls and totals per capture'
+---
+
+## What it returns
+
+The levels of the `TOTAL` snapshot (all expirations combined) over a time
+window, oldest first. One row per capture (`15m`), per hour (`1h`) or per session
+(`close`). Use it to see how flip, regime and walls moved. For the per-strike
+picture at one moment use [`/history/snapshot`](/api-reference/history-snapshot);
+for bulk data use [`/history/files`](/api-reference/history-files).
+
+Costs **1 request** against your [daily quota](/rate-limits). Read
+[Historical data](/history) first for session dates, the close definition and
+point-in-time semantics.
+
+## Path parameters
+
+<ParamField path="exchange" type="string" required>
+  `bybit`, `deribit`, `okx`, `derive`, `combined` or `tradfi`. `all` and
+  `combined` with a TradFi ticker resolve to `tradfi`. Venue subsets such as
+  `deribit+derive` return `400 history_not_available`.
+</ParamField>
+
+<ParamField path="coin" type="string" required>
+  Symbol, for example `BTC`, `QQQ`. Case-insensitive.
+</ParamField>
+
+## Query parameters
+
+<ParamField query="start" type="string">
+  ISO date or datetime, UTC. **Inclusive.** Default: `end` minus 30 days.
+  Years 2020 to 2100 are accepted.
+</ParamField>
+
+<ParamField query="end" type="string">
+  ISO date or datetime, UTC. **Exclusive.** Default: the end of the current
+  15-minute capture slot, so the newest capture is included. `start` after `end`
+  returns `400 invalid_param`.
+</ParamField>
+
+<ParamField query="granularity" type="string" default="close">
+  `15m` (every capture), `1h` (the last capture of each UTC hour) or `close`
+  (the last capture of each session date).
+
+  | Granularity | Maximum window |
+  |-------------|----------------|
+  | `15m` | 31 days |
+  | `1h` | 180 days |
+  | `close` | unlimited |
+
+  A longer window returns `400 range_too_large` with `max_window_days`.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  The opaque `meta.next_cursor` of the previous page. Pass the same `exchange`,
+  `coin`, `end` and `granularity` as before. `start` is replaced by the cursor, so
+  pages never overlap.
+</ParamField>
+
+## Pagination
+
+A response has at most **5,000 rows**. When there is more, `meta.next_cursor` is
+set (otherwise it is `null`); send it back as `?cursor=` to get the next page.
+With the window limits above, `15m` and `1h` requests normally fit in one page;
+paging matters for long `close` ranges.
+
+## Response
+
+<ResponseField name="data" type="array">
+  One object per row. `type` is `close` only for the last capture of a completed
+  session, otherwise `intraday`. `oi_date` is the session whose open interest the
+  row used (see [Historical data](/history#point-in-time-no-look-ahead)).
+
+  The fields are `schema_version`, `timestamp_utc`, `session_date`, `type`,
+  `exchange`, `symbol`, `oi_date`, then the levels fields: `spot`, `flip`,
+  `flip_count`, `regime`, `net_gex`, `abs_gex`, `call_gex`, `put_gex`,
+  `call_oi_total`, `put_oi_total`, `p1_strike` ... `a2_gex`, `s_price`, `s_gex`,
+  `v_price`, `v_gex`, `max_pain`, `atm_iv`. All are defined in the
+  [data dictionary](/data-dictionary). Rows are `TOTAL`, so there is no
+  `expiration` or `dte` field and `max_pain` is always `null`. Missing values are
+  `null`.
+</ResponseField>
+
+<ResponseField name="meta" type="object">
+  `exchange` and `coin` as requested, `symbol`, `exchange_resolved`, `market`,
+  `units`, `docs_url`, `granularity`, `start` and `end` (as applied, ISO 8601
+  UTC `Z`), `next_cursor`, and your `rate_limit`.
+</ResponseField>
+
+## Errors
+
+<ResponseField name="400 history_not_available" type="error">
+  Venue subset. The body includes `valid_exchanges`.
+</ResponseField>
+
+<ResponseField name="400 range_too_large" type="error">
+  The window is longer than the granularity allows. The body includes
+  `max_window_days`.
+</ResponseField>
+
+<ResponseField name="400 invalid_param" type="error">
+  Unparseable `start`, `end` or `cursor`, `start` after `end`, a year outside
+  2020 to 2100, or an unknown `granularity` (the body includes `valid_values`).
+</ResponseField>
+
+<ResponseField name="400 invalid_exchange / invalid_pair" type="error">
+  Unknown venue, or a venue that does not match the coin's market.
+</ResponseField>
+
+<ResponseField name="403 market_not_in_plan" type="error">
+  Your plan does not include this coin's market.
+</ResponseField>
+
+An empty window is not an error: `data` is `[]`. Check
+[`/history/coverage`](/api-reference/history-coverage) for where history starts.
+
+<RequestExample>
+
+```bash cURL
+curl "https://api.gammaflip.io/api/v1/history/levels/tradfi/QQQ?start=2026-09-01&end=2026-10-01&granularity=close" \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+```python Python
+import requests
+import pandas as pd
+
+H = {"X-API-Key": "gex_sk_your_key_here"}
+url = "https://api.gammaflip.io/api/v1/history/levels/tradfi/QQQ"
+params = {"start": "2026-09-01", "end": "2026-10-01", "granularity": "close"}
+
+rows = []
+while True:
+    body = requests.get(url, headers=H, params=params).json()
+    rows += body["data"]
+    cursor = body["meta"]["next_cursor"]
+    if not cursor:
+        break
+    params["cursor"] = cursor
+
+df = pd.DataFrame(rows)
+print(df[["session_date", "spot", "flip", "regime", "net_gex"]])
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "data": [
+    {
+      "schema_version": 1,
+      "timestamp_utc": "2026-10-05T20:15:00Z",
+      "session_date": "2026-10-05",
+      "type": "close",
+      "exchange": "tradfi",
+      "symbol": "QQQ",
+      "oi_date": "2026-10-02",
+      "spot": 755.8,
+      "flip": 744.59,
+      "flip_count": 1,
+      "regime": "positive",
+      "net_gex": 2380000000.0,
+      "abs_gex": 9940000000.0,
+      "call_gex": 6160000000.0,
+      "put_gex": 3780000000.0,
+      "call_oi_total": 1204500,
+      "put_oi_total": 987300,
+      "p1_strike": 760, "p1_gex": 1300000000.0,
+      "p2_strike": 755, "p2_gex": 910000000.0,
+      "n1_strike": 740, "n1_gex": -820000000.0,
+      "n2_strike": 735, "n2_gex": -540000000.0,
+      "a1_strike": 760, "a1_gex": 1404000000.0,
+      "a2_strike": 750, "a2_gex": 1120000000.0,
+      "s_price": 758.0, "s_gex": 1900000000.0,
+      "v_price": 735.0, "v_gex": -1100000000.0,
+      "max_pain": null,
+      "atm_iv": 0.19
+    }
+  ],
+  "meta": {
+    "timestamp": "2026-10-06T10:00:00.000000+00:00",
+    "exchange": "tradfi",
+    "coin": "QQQ",
+    "symbol": "QQQ",
+    "exchange_resolved": "tradfi",
+    "market": "tradfi",
+    "units": "USD per 1% move of the underlying",
+    "docs_url": "https://docs.gammaflip.io/data-dictionary",
+    "granularity": "close",
+    "next_cursor": null,
+    "start": "2026-09-01T00:00:00Z",
+    "end": "2026-10-01T00:00:00Z",
+    "rate_limit": { "limit": 500, "remaining": 497, "reset": "2026-10-07T00:00:00+00:00" }
+  }
+}
+```
+
+```json 400 Bad Request
+{
+  "error": "range_too_large",
+  "message": "granularity 15m allows at most 31 days.",
+  "max_window_days": 31
+}
+```
+
+</ResponseExample>
+
+<Note>
+The values above are illustrative and the response is shortened to one row.
+</Note>

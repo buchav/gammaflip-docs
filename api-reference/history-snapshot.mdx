@@ -1,0 +1,155 @@
+---
+title: 'History: Snapshot'
+api: 'GET /history/snapshot/{exchange}/{coin}'
+description: 'The full per-strike picture at one moment in the past'
+---
+
+## What it returns
+
+The stored snapshot nearest to a moment `at`: the snapshot-level fields (the same
+columns as [`/history/levels`](/api-reference/history-levels), plus `expiration`
+and `dte`) and a `strikes` array with one row per strike within +/- 25% of that
+snapshot's spot. Use it to rebuild the GEX profile of a past moment.
+
+Costs **1 request** against your [daily quota](/rate-limits). Past snapshots never
+change, so repeated calls are cheap for us and fast for you.
+
+## Path parameters
+
+<ParamField path="exchange" type="string" required>
+  `bybit`, `deribit`, `okx`, `derive`, `combined` or `tradfi`. Venue subsets return
+  `400 history_not_available`.
+</ParamField>
+
+<ParamField path="coin" type="string" required>
+  Symbol, for example `BTC`, `QQQ`. Case-insensitive.
+</ParamField>
+
+## Query parameters
+
+<ParamField query="at" type="string" required>
+  ISO datetime, UTC (`2026-10-05T19:50:00Z`). The capture **nearest to `at`
+  within 15 minutes** (before or after) is returned. Find exact capture times with
+  [`/history/timestamps`](/api-reference/history-timestamps).
+</ParamField>
+
+<ParamField query="expiration" type="string" default="TOTAL">
+  `TOTAL` (all expirations combined) or an ISO expiration date such as
+  `2026-10-09`. Expiration codes such as `9OCT26` are not accepted here.
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="object">
+  `schema_version`, `timestamp_utc` (the capture actually returned),
+  `session_date`, `type`, `exchange`, `symbol`, `expiration` (`TOTAL` or ISO date),
+  `dte` (`null` for `TOTAL`), `oi_date`, and the levels fields
+  (`spot`, `flip`, `regime`, `net_gex`, ... `atm_iv`). `max_pain` is set for a
+  single expiration and `null` for `TOTAL`. `type` is `close` when this capture
+  is the last one of a completed session, otherwise `intraday`. All fields are
+  defined in the [data dictionary](/data-dictionary).
+
+  `strikes` is an array of `{strike, call_gex, put_gex, net_gex, call_oi, put_oi}`,
+  sorted by strike, limited to strikes within +/- 25% of `spot`.
+</ResponseField>
+
+<ResponseField name="meta" type="object">
+  `exchange`, `coin`, `symbol`, `exchange_resolved`, `market`, `units`,
+  `docs_url`, `snapshot_at` (the returned capture) and your `rate_limit`.
+</ResponseField>
+
+## Errors
+
+<ResponseField name="404 no_snapshot" type="error">
+  No capture within 15 minutes of `at`. The body includes `nearest_timestamps`:
+  up to three capture times closest to `at`, taken from the `TOTAL` captures.
+</ResponseField>
+
+<ResponseField name="400 invalid_param" type="error">
+  `at` missing or unparseable, a year outside 2020 to 2100, or `expiration` that is
+  neither `TOTAL` nor `YYYY-MM-DD`.
+</ResponseField>
+
+<ResponseField name="400 history_not_available" type="error">
+  Venue subset. The body includes `valid_exchanges`.
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl "https://api.gammaflip.io/api/v1/history/snapshot/tradfi/QQQ?at=2026-10-05T19:50:00Z&expiration=TOTAL" \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+```python Python
+import requests
+import pandas as pd
+
+resp = requests.get(
+    "https://api.gammaflip.io/api/v1/history/snapshot/tradfi/QQQ",
+    headers={"X-API-Key": "gex_sk_your_key_here"},
+    params={"at": "2026-10-05T19:50:00Z"},
+)
+snap = resp.json()["data"]
+strikes = pd.DataFrame(snap["strikes"])
+print(snap["timestamp_utc"], snap["spot"], snap["flip"])
+print(strikes.sort_values("net_gex").tail(3))
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "data": {
+    "schema_version": 1,
+    "timestamp_utc": "2026-10-05T19:45:00Z",
+    "session_date": "2026-10-05",
+    "type": "intraday",
+    "exchange": "tradfi",
+    "symbol": "QQQ",
+    "expiration": "TOTAL",
+    "dte": null,
+    "oi_date": "2026-10-02",
+    "spot": 755.4,
+    "flip": 744.59,
+    "regime": "positive",
+    "net_gex": 2310000000.0,
+    "...": "remaining levels fields",
+    "strikes": [
+      { "strike": 755, "call_gex": 910000000.0, "put_gex": 40000000.0,
+        "net_gex": 870000000.0, "call_oi": 70120, "put_oi": 6100 },
+      { "strike": 760, "call_gex": 1340000000.0, "put_gex": 51000000.0,
+        "net_gex": 1289000000.0, "call_oi": 88100, "put_oi": 9020 }
+    ]
+  },
+  "meta": {
+    "timestamp": "2026-10-06T10:00:00.000000+00:00",
+    "exchange": "tradfi",
+    "coin": "QQQ",
+    "symbol": "QQQ",
+    "exchange_resolved": "tradfi",
+    "market": "tradfi",
+    "units": "USD per 1% move of the underlying",
+    "docs_url": "https://docs.gammaflip.io/data-dictionary",
+    "snapshot_at": "2026-10-05T19:45:00Z",
+    "rate_limit": { "limit": 500, "remaining": 495, "reset": "2026-10-07T00:00:00+00:00" }
+  }
+}
+```
+
+```json 404 Not Found
+{
+  "error": "no_snapshot",
+  "message": "No capture within 15 minutes of 'at'.",
+  "nearest_timestamps": ["2026-10-05T20:15:00Z", "2026-10-05T13:45:00Z", "2026-10-05T13:30:00Z"]
+}
+```
+
+</ResponseExample>
+
+<Note>
+The values above are illustrative and shortened (the `"..."` entry stands for the
+other levels fields).
+</Note>

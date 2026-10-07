@@ -3,11 +3,11 @@ title: 'Quickstart'
 description: 'From zero to your first GEX request in 5 minutes'
 ---
 
-## 1. Get a subscription
+## 1. Get access
 
-Sign up at [gammaflip.io](https://gammaflip.io). You get a 14-day trial with
-API access included (50 requests/day). To unlock 500 requests/day and up to
-5 keys, [upgrade to Pro](https://gammaflip.io/subscribe?plan=pro).
+Sign up at [gammaflip.io](https://gammaflip.io). You get a 3-day trial with
+API access included (50 requests/day). Every paid plan (Crypto, TradFi, Complete) gets
+500 requests/day and up to 5 keys; see [Authentication](/authentication).
 
 ## 2. Create an API key
 
@@ -24,7 +24,7 @@ need to create a new one.
 
 ## 3. Make your first request
 
-List available exchanges:
+List available exchanges (free: discovery calls don't count against your quota):
 
 <CodeGroup>
 
@@ -57,16 +57,15 @@ Expected response:
 ```json
 {
   "data": {
-    "available": { "bybit": true, "deribit": true, "okx": true },
-    "virtual": ["all"]
+    "available": ["bybit", "deribit", "okx", "derive", "tradfi"],
+    "virtual": ["all"],
+    "markets": {
+      "crypto": ["deribit", "bybit", "okx", "derive"],
+      "tradfi": ["tradfi"]
+    }
   },
   "meta": {
-    "timestamp": "2026-04-14T10:00:00+00:00",
-    "rate_limit": {
-      "limit": 500,
-      "remaining": 499,
-      "reset": "2026-04-15T00:00:00+00:00"
-    }
+    "timestamp": "2026-10-06T10:00:00+00:00"
   }
 }
 ```
@@ -94,9 +93,22 @@ for exp in data["expirations"]:
 
 </CodeGroup>
 
-## 5. Check your rate limit
+## 5. Get the key levels in one call
 
-Every response includes these headers:
+`/levels` returns a small flat object (flip, regime, walls, totals) for the
+latest snapshot. Try a US ticker:
+
+```bash
+curl https://api.gammaflip.io/api/v1/levels/tradfi/QQQ \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+Every response says how fresh it is (`meta.as_of`, `meta.oi_as_of`). Field
+definitions are in the [data dictionary](/data-dictionary).
+
+## 6. Check your rate limit
+
+Counted responses (`/gex/...`, `/levels/...`) include these headers:
 
 ```
 X-RateLimit-Limit: 500
@@ -104,8 +116,9 @@ X-RateLimit-Remaining: 498
 X-RateLimit-Reset: 2026-04-15T00:00:00+00:00
 ```
 
-When you hit the limit, you'll get `429 Too Many Requests`. Quota resets at
-**midnight UTC** every day.
+When you hit the limit, you'll get `429 Too Many Requests` (with no
+`Retry-After` header; use `X-RateLimit-Reset`). Quota resets at **midnight UTC**
+every day. [`GET /me`](/api-reference/me) shows your quota for free.
 
 <Tip>
 The underlying GEX data updates every 15 minutes (from our Lambda capture).
@@ -117,6 +130,9 @@ Polling more frequently than that doesn't yield new data.
 <CardGroup cols={2}>
   <Card title="API Reference" icon="book" href="/api-reference/exchanges">
     Full reference for all endpoints, parameters, and response schemas.
+  </Card>
+  <Card title="Markets and exchanges" icon="globe" href="/markets-and-exchanges">
+    Crypto venues, TradFi tickers, subsets and expiration cutoffs.
   </Card>
   <Card title="Authentication" icon="key" href="/authentication">
     Learn about tiers, key management, and security best practices.

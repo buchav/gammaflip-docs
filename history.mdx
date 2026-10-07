@@ -1,0 +1,90 @@
+---
+title: 'Historical data'
+description: 'Stored GEX snapshots: levels time series, per-strike snapshots and daily bulk files'
+---
+
+GammaFlip stores a GEX snapshot every 15 minutes for every tracked symbol. The
+history endpoints give you three ways to read that archive.
+
+| You want | Use | Cost |
+|----------|-----|------|
+| How the levels (flip, walls, totals) moved over time | [`/history/levels`](/api-reference/history-levels) | 1 request |
+| The capture times of one day | [`/history/timestamps`](/api-reference/history-timestamps) | 1 request |
+| The full per-strike picture at one moment | [`/history/snapshot`](/api-reference/history-snapshot) | 1 request |
+| What history exists for each symbol | [`/history/coverage`](/api-reference/history-coverage) | Free |
+| Bulk CSV files for backtests and spreadsheets | [`/history/files`](/api-reference/history-files) | 1 request for the listing, 1 file credit per download |
+
+Field definitions are in the [data dictionary](/data-dictionary), including the
+exact columns of the three daily files.
+
+## Exchanges
+
+History is kept for `bybit`, `deribit`, `okx`, `derive`, `combined` (all crypto
+venues merged) and `tradfi`. As everywhere else in the API, `all` / `combined`
+with a TradFi ticker resolve to `tradfi`.
+
+<Warning>
+**Venue subsets such as `deribit+derive` have no history.** They are not stored,
+so the history endpoints answer `400 history_not_available` with
+`valid_exchanges`. Per-strike GEX can be summed client-side from single-venue
+data; the gamma flip cannot. The same applies to `?compare=` on
+[`/levels`](/api-reference/levels).
+</Warning>
+
+## Session date
+
+Every row carries a `session_date`:
+
+- **Crypto**: the UTC calendar date.
+- **TradFi**: the US trading date, the America/New_York calendar date.
+
+A session counts as **complete** 15 minutes after midnight UTC (crypto) or 30
+minutes after the market close (TradFi; early closes are honoured). Daily files
+are published once a session is complete.
+
+## Close
+
+`type` is `close` for the **last capture of a completed session**. Every other
+row is `intraday`, including the last capture of a session that is still open.
+A row can therefore change from `intraday` to `close` after the fact, because
+`type` describes the session, not the capture.
+
+## Point-in-time, no look-ahead
+
+Each row is the data as it was captured at `timestamp_utc`. Rows are never
+rewritten with later data, which is what a backtest needs.
+
+For TradFi the open interest of a session is published after that session, so
+a row captured on session D (including its close) uses the open interest of
+the previous session. `oi_date` tells you which session's open interest the row
+used. For crypto, open interest is live and `oi_date` equals `session_date`.
+
+## What is in a snapshot
+
+- Every capture has a `TOTAL` snapshot (all expirations combined) and one
+  snapshot per expiration. `/history/levels` returns `TOTAL` only;
+  `/history/snapshot` and the `levels` and `strikes_by_expiry` files also cover
+  single expirations.
+- Per-strike data covers strikes within +/- 25% of that snapshot's spot.
+- Timestamps are ISO 8601 UTC with `Z` and second precision. Expirations are
+  ISO `YYYY-MM-DD` or `TOTAL`.
+- All GEX values are USD per 1% move of the underlying. `call_gex` and
+  `put_gex` are non-negative; `net_gex = call_gex - put_gex`.
+- `schema_version` is `1` today. Existing columns will not change meaning
+  within a version.
+
+## Not available
+
+- **Volume** is not captured. There are no volume columns.
+- **Venue subsets** (see above).
+- Snapshots from before open interest was stored have empty `call_oi` / `put_oi`
+  columns.
+
+Use [`/history/coverage`](/api-reference/history-coverage) to see where each
+symbol's history starts.
+
+## Quotas
+
+The query endpoints cost one request from your daily quota. File downloads use
+a separate daily bucket of file credits, so a bulk download never eats your
+request quota. See [Rate limits](/rate-limits#history-file-credits).

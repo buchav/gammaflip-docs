@@ -20,11 +20,13 @@ structure, and to spot the expirations where dealer positioning is heaviest.
 ## Path parameters
 
 <ParamField path="exchange" type="string" required>
-  Exchange name: `bybit`, `deribit`, `okx`, or `all` (cross-exchange aggregation).
+  Crypto: `bybit`, `deribit`, `okx`, `derive`, `all` / `combined`, or a subset
+  such as `deribit+derive`. TradFi tickers: `tradfi` (`all` and `combined` are
+  aliases). See [Markets and exchanges](/markets-and-exchanges).
 </ParamField>
 
 <ParamField path="coin" type="string" required>
-  Base coin symbol (uppercase).
+  Symbol, for example `BTC`, `ETH`, `QQQ`. Case-insensitive.
 </ParamField>
 
 ## Response shape
@@ -89,13 +91,22 @@ Each entry in `exchanges.*` and `total` contains the same metric set:
 | `downside_gex` | GEX concentrated below spot |
 
 `total` holds the aggregate across all exchanges included in the response.
+
+The response `meta` also carries `as_of`, `oi_as_of`, `data_source`, `units` and
+the other keys described under [Response meta](/api-reference/by-strike-enhanced#response-meta).
+This call counts as 1 request.
 When querying a single exchange (e.g. `deribit`), `exchanges.deribit` and
 `total` are identical.
 
 ## Errors
 
-<ResponseField name="400 invalid_exchange" type="error">
-  Exchange name not recognized.
+<ResponseField name="400 invalid_exchange / invalid_pair" type="error">
+  Exchange name not recognized, or it does not match the coin's market. The body
+  includes `valid_exchanges`.
+</ResponseField>
+
+<ResponseField name="403 market_not_in_plan" type="error">
+  Your plan does not include this coin's market. The body includes `markets_in_plan`.
 </ResponseField>
 
 <ResponseField name="403 market_not_in_plan" type="error">

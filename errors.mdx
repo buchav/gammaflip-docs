@@ -5,36 +5,44 @@ description: 'Error codes and how to handle them'
 
 ## Error format
 
-All errors return a JSON body with `error` and `message`:
+All errors return a JSON body with `error` and `message`. Branch on `error`, a
+stable slug; `message` is prose for humans and may change at any time, so never
+parse it. Errors are never wrapped in the `data` / `meta` envelope used by
+successful responses, on any endpoint, so `response.json()["error"]` is safe
+everywhere. Some errors add hint fields that let a client or an agent correct itself:
 
 ```json
 {
-  "error": "rate_limit_exceeded",
-  "message": "Daily limit of 500 requests reached."
+  "error": "invalid_exchange",
+  "message": "Exchange 'kraken' is not available.",
+  "valid_exchanges": ["deribit", "bybit", "okx", "derive", "combined"]
 }
 ```
 
-- **`error`** is a stable slug. Branch on this — it will not change for a
-  given condition.
-- **`message`** is prose for humans. **Never parse it**; the wording may change
-  at any time without notice.
-
-Some errors add context fields alongside those two (documented per error
-below). Errors are never wrapped in the `data` / `meta` envelope used by
-successful responses — on any endpoint — so `response.json()["error"]` is safe
-everywhere.
+| Hint field | Returned with |
+|------------|---------------|
+| `valid_exchanges` | `invalid_exchange`, `invalid_pair`, `history_not_available` |
+| `nearest_expirations` | `invalid_expiration` |
+| `valid_values` | `invalid_param` (for `view`, `granularity`, `file`, `compare`) |
+| `max_value` | `invalid_param` (for `range_pct`) |
+| `max_window_days` | `range_too_large` |
+| `nearest_timestamps` | `no_snapshot` |
+| `markets_in_plan` | `market_not_in_plan` |
+| `supported_crypto`, `supported_tradfi` | `unsupported_coin` |
 
 ## HTTP status codes
 
 | Code | Meaning | Common causes |
 |------|---------|---------------|
 | `200` | OK | — |
-| `400` | Bad Request | Invalid exchange name, malformed parameters |
+| `400` | Bad Request | Invalid exchange, pair, expiration or parameter |
 | `401` | Unauthorized | Missing or invalid API key |
-| `403` | Forbidden | Subscription doesn't allow API access (`subscription_required`), or the symbol belongs to a market your plan doesn't cover (`market_not_in_plan`) |
-| `404` | Not Found | No data available for this coin/exchange/expiration |
-| `429` | Too Many Requests | Daily quota exceeded — see [rate limits](/rate-limits) |
+| `403` | Forbidden | Plan has no API access (`subscription_required`), or the symbol belongs to a market your plan doesn't cover (`market_not_in_plan`) |
+| `404` | Not Found | Coin or ticker we don't cover, no data for this coin/exchange/expiration, or no history snapshot or file |
+| `405` | Method Not Allowed | `HEAD` on a history file download — use `GET` |
+| `429` | Too Many Requests | Daily request quota or daily history file credits exceeded — see [rate limits](/rate-limits) |
 | `500` | Server Error | Something went wrong on our side — retry or contact support |
+| `503` | Service Unavailable | A data source (for example TradFi) or history file storage is temporarily unavailable — retry later |
 
 ## Error codes
 
@@ -70,9 +78,8 @@ one code deliberately, so you only need a single branch.
 }
 ```
 
-Your subscription doesn't include API access. The `current_tier` field shows
-your current plan. [Upgrade to Pro](https://gammaflip.io/subscribe?plan=pro)
-to get API access.
+Your plan doesn't include API access (a plan entitlement, not a tier name).
+`current_tier` shows your current tier. [Get API access](https://gammaflip.io/#pricing).
 
 ### `market_not_in_plan` (403)
 
@@ -81,19 +88,21 @@ to get API access.
   "error": "market_not_in_plan",
   "message": "Your plan does not include the tradfi market.",
   "market": "tradfi",
-  "current_tier": "premium"
+  "current_tier": "premium",
+  "markets_in_plan": ["crypto"]
 }
 ```
 
 Your key is valid and API access is enabled, but the symbol you requested
 belongs to a market your plan doesn't cover. GammaFlip sells **crypto** and
-**tradfi** as separate markets, so a crypto-only plan gets this on `SPX`, and a
-tradfi-only plan gets it on `BTC`.
+**tradfi** as separate markets, so the Crypto plan gets this on `SPX` or `QQQ`,
+and the TradFi plan on `BTC`. The Complete plan covers both.
 
 | Field | Meaning |
 |-------|---------|
 | `market` | The market the requested symbol belongs to: `crypto` or `tradfi` |
 | `current_tier` | Your current plan tier |
+| `markets_in_plan` | The markets you can use; [`/me`](/api-reference/me) shows the same |
 
 Only endpoints taking a `<coin>` path parameter can return this. The discovery
 endpoints (`/exchanges`, `/coins`) list availability rather than market data,
@@ -107,12 +116,74 @@ market you already have.
 ```json
 {
   "error": "invalid_exchange",
-  "message": "Exchange 'kraken' is not available."
+  "message": "Exchange 'kraken' is not available.",
+  "valid_exchanges": ["deribit", "bybit", "okx", "derive", "combined"]
 }
 ```
 
-Valid values: `bybit`, `deribit`, `okx`, and the virtual `all` / `combined`
-(aggregated).
+For crypto coins valid values are `bybit`, `deribit`, `okx`, `derive`,
+`all` / `combined`, or a subset like `deribit+derive`; `valid_exchanges` lists
+what is currently available. See [Markets and exchanges](/markets-and-exchanges).
+
+### `invalid_pair` (400)
+
+```json
+{
+  "error": "invalid_pair",
+  "message": "QQQ is a TradFi ticker; use exchange 'tradfi'.",
+  "valid_exchanges": ["tradfi"]
+}
+```
+
+The exchange does not match the coin's market: a crypto venue with a TradFi
+ticker, or `tradfi` with a crypto coin.
+
+### `invalid_expiration` (400)
+
+```json
+{
+  "error": "invalid_expiration",
+  "message": "Expiration '2026-10-18' is not listed.",
+  "nearest_expirations": ["2026-10-17", "2026-10-19"]
+}
+```
+
+The expiration isn't one of the live expirations. `nearest_expirations` holds up
+to five ISO dates closest to the one you sent (the earliest five if the value is
+not a date). Use `TOTAL`, or pick one from
+`nearest_expirations` or [`/expirations`](/api-reference/expirations).
+
+### `invalid_param` (400)
+
+```json
+{
+  "error": "invalid_param",
+  "message": "range_pct must be a number in (0, 50].",
+  "max_value": 50
+}
+```
+
+A query parameter is invalid: `view` must be `full` or `levels`
+(`valid_values`), and `range_pct` must be in (0, 50] (`max_value`). On the history
+endpoints it also covers an unparseable `start`, `end`, `at`, `date` or `cursor`,
+`start` after `end`, a year outside 2020 to 2100, an unknown `granularity` or
+`file` (`valid_values`), and `?compare=` other than `1d`, `7d`, `30d` or used
+with a single expiration.
+
+### `unsupported_coin` (404)
+
+```json
+{
+  "error": "unsupported_coin",
+  "message": "GOOGL is not supported. Crypto coins and US tickers we cover are listed in supported_crypto / supported_tradfi (also GET /api/v1/coins).",
+  "supported_crypto": ["BTC", "ETH", "HYPE", "SOL", "XRP"],
+  "supported_tradfi": ["AAPL", "AMD", "AMZN", "DIA", "DJX", "GLD", "IBIT", "IWM", "META", "MSFT", "NVDA", "QQQ", "RUT", "SLV", "SPX", "SPY", "TSLA"]
+}
+```
+
+The coin is neither a crypto coin on any of our exchanges nor a US ticker we track.
+Returned by every `{exchange}/{coin}` endpoint, including history, before any
+exchange check. Pick a symbol from the two lists, or call [`/coins`](/api-reference/coins).
 
 ### `no_data` (404)
 
@@ -123,10 +194,17 @@ Valid values: `bybit`, `deribit`, `okx`, and the virtual `all` / `combined`
 }
 ```
 
-The combination of coin/exchange/expiration doesn't exist. Common causes:
+The combination of coin/exchange/expiration has no data. Common causes:
 - The exchange doesn't list options for this coin (e.g., OKX doesn't have XRP)
 - The expiration has already expired
-- The basecoin is mistyped (must be uppercase)
+
+### `market_unavailable` (503)
+
+```json
+{ "error": "market_unavailable", "message": "TradFi data is temporarily unavailable." }
+```
+
+The data source for the market is down. Retry after a short delay.
 
 ### `rate_limit_exceeded` (429)
 
@@ -150,6 +228,92 @@ The `rate_limit` object repeats the figures from the `X-RateLimit-*` headers.
 </Warning>
 
 See [Rate Limits](/rate-limits) for handling strategies.
+
+### History errors
+
+The [history endpoints](/history) add these slugs.
+
+#### `history_not_available` (400)
+
+```json
+{
+  "error": "history_not_available",
+  "message": "History is kept per exchange and for 'combined', not for subsets.",
+  "valid_exchanges": ["bybit", "deribit", "okx", "derive", "combined"]
+}
+```
+
+Venue subsets such as `deribit+derive` have no history. Use one venue or
+`combined`. The same applies to `?compare=` on [`/levels`](/api-reference/levels).
+
+#### `range_too_large` (400)
+
+```json
+{
+  "error": "range_too_large",
+  "message": "granularity 15m allows at most 31 days.",
+  "max_window_days": 31
+}
+```
+
+The window of [`/history/levels`](/api-reference/history-levels) is longer than
+the granularity allows: `15m` up to 31 days, `1h` up to 180 days, `close`
+unlimited. Shorten the window or use a coarser granularity.
+
+#### `no_snapshot` (404)
+
+```json
+{
+  "error": "no_snapshot",
+  "message": "No capture within 15 minutes of 'at'.",
+  "nearest_timestamps": ["2026-10-05T20:15:00Z", "2026-10-05T13:45:00Z"]
+}
+```
+
+[`/history/snapshot`](/api-reference/history-snapshot) found no capture within 15
+minutes of `at`. Retry with one of `nearest_timestamps` (up to three, from the
+`TOTAL` captures).
+
+#### `no_file` (404)
+
+```json
+{ "error": "no_file", "message": "No strikes_total file for QQQ on 2026-10-04." }
+```
+
+There is no daily file for that exchange, symbol, date and kind. The date is
+outside [coverage](/api-reference/history-coverage), or the session is not
+complete yet. No file credit is spent.
+
+#### `files_unavailable` (503)
+
+```json
+{ "error": "files_unavailable", "message": "History files are temporarily unavailable." }
+```
+
+File storage is down or not reachable. Retry later. No file credit is spent.
+
+#### `method_not_allowed` (405)
+
+```json
+{ "error": "method_not_allowed", "message": "Use GET to download a history file." }
+```
+
+A history file download was requested with `HEAD`. The response has `Allow: GET`.
+No file credit is spent.
+
+#### `history_files_limit_exceeded` (429)
+
+```json
+{
+  "error": "history_files_limit_exceeded",
+  "message": "Daily limit of 200 history files reached.",
+  "rate_limit": { "limit": 200, "remaining": 0, "reset": "2026-10-07T00:00:00+00:00" }
+}
+```
+
+The daily file credits are used up (trial 20, other plans with API access 200).
+There is no `Retry-After` header; read `X-History-Files-Reset` or
+[`/me`](/api-reference/me). See [Rate limits](/rate-limits#history-file-credits).
 
 ## Getting help
 

@@ -22,6 +22,14 @@
               "rate-limits",
               "errors"
             ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "markets-and-exchanges",
+              "data-dictionary",
+              "history"
+            ]
           }
         ]
       },
@@ -33,9 +41,21 @@
             "pages": [
               "api-reference/exchanges",
               "api-reference/coins",
+              "api-reference/me",
               "api-reference/expirations",
+              "api-reference/levels",
               "api-reference/term-oi",
               "api-reference/by-strike-enhanced"
+            ]
+          },
+          {
+            "group": "History",
+            "pages": [
+              "api-reference/history-levels",
+              "api-reference/history-timestamps",
+              "api-reference/history-snapshot",
+              "api-reference/history-coverage",
+              "api-reference/history-files"
             ]
           }
         ],

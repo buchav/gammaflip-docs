@@ -1,0 +1,104 @@
+---
+title: 'Me'
+api: 'GET /me'
+description: 'Your plan, markets and today''s quota. Free: not counted against the quota'
+---
+
+## What it returns
+
+Who you are to the API: the plan tier, which markets it includes, whether API
+access is enabled, and how much of today's quota is used. Call it before a
+batch job, or when a `429` tells you the quota is gone and you need to know when
+it resets (a `429` carries no `Retry-After` header).
+
+This endpoint is **free**: it does not count against your quota.
+
+## Response
+
+<ResponseField name="data.tier" type="string">
+  Your plan tier (for example `trial`).
+</ResponseField>
+
+<ResponseField name="data.markets" type="array">
+  Markets your plan includes: `crypto`, `tradfi`. Requests for a coin from a
+  market not in this list return `403 market_not_in_plan`.
+</ResponseField>
+
+<ResponseField name="data.api_access" type="boolean">
+  Whether the plan includes API access. Always `true` on a successful call
+  (without it the API answers `403 subscription_required`).
+</ResponseField>
+
+<ResponseField name="data.quota.requests.limit" type="integer">
+  Daily request limit. `0` means unlimited.
+</ResponseField>
+
+<ResponseField name="data.quota.requests.used" type="integer">
+  Counted requests made today (UTC). `null` if the counter could not be read.
+</ResponseField>
+
+<ResponseField name="data.quota.requests.remaining" type="integer">
+  Requests left today. `null` when the limit is unlimited or `used` is unknown.
+</ResponseField>
+
+<ResponseField name="data.quota.requests.reset" type="string">
+  When the counter resets, ISO 8601, midnight UTC.
+</ResponseField>
+
+<ResponseField name="data.quota.history_files" type="object">
+  The separate daily bucket of [history file credits](/rate-limits#history-file-credits),
+  with the same `limit`, `used`, `remaining` and `reset` fields as
+  `quota.requests`. `limit` is 20 on the trial, 200 on other plans with API access
+  and `0` (unlimited) for admin accounts.
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl https://api.gammaflip.io/api/v1/me \
+  -H "X-API-Key: gex_sk_your_key_here"
+```
+
+```python Python
+import requests
+
+resp = requests.get(
+    "https://api.gammaflip.io/api/v1/me",
+    headers={"X-API-Key": "gex_sk_your_key_here"},
+)
+q = resp.json()["data"]["quota"]["requests"]
+print(f"{q['remaining']} of {q['limit']} requests left, resets {q['reset']}")
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200 OK
+{
+  "data": {
+    "tier": "trial",
+    "markets": ["crypto", "tradfi"],
+    "api_access": true,
+    "quota": {
+      "requests": {
+        "limit": 50,
+        "used": 13,
+        "remaining": 37,
+        "reset": "2026-10-07T00:00:00+00:00"
+      },
+      "history_files": {
+        "limit": 20,
+        "used": 2,
+        "remaining": 18,
+        "reset": "2026-10-07T00:00:00+00:00"
+      }
+    }
+  },
+  "meta": {
+    "timestamp": "2026-10-06T10:00:00.000000+00:00"
+  }
+}
+```
+
+</ResponseExample>

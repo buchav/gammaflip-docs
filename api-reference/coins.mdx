@@ -1,7 +1,7 @@
 ---
 title: 'List Coins'
 api: 'GET /coins'
-description: 'Returns available base coins across all exchanges'
+description: 'Returns available symbols across all exchanges, split by market. Free: not counted against the quota'
 ---
 
 ## Response
@@ -10,8 +10,19 @@ description: 'Returns available base coins across all exchanges'
   Sorted list of base coin symbols (uppercase) that have options listed on at
   least one supported exchange.
 
-  Typical values: `BTC`, `ETH`, `SOL`, `XRP`, and others that exchanges may list.
+  Typical values: `BTC`, `ETH`, `SOL`, `XRP`, and TradFi tickers such as `SPX`,
+  `SPY`, `QQQ`.
 </ResponseField>
+
+<ResponseField name="data.markets" type="object">
+  The same symbols split by market: `{"crypto": [...], "tradfi": [...]}`. The
+  market decides which `{exchange}` values are valid for a symbol. See
+  [Markets and exchanges](/markets-and-exchanges).
+</ResponseField>
+
+<Note>
+This endpoint is free and does not count against your quota.
+</Note>
 
 <RequestExample>
 
@@ -38,15 +49,14 @@ print(f"Available coins: {', '.join(coins)}")
 ```json 200 OK
 {
   "data": {
-    "coins": ["BTC", "ETH", "SOL", "XRP"]
+    "coins": ["BTC", "ETH", "QQQ", "SOL", "SPX", "SPY", "XRP"],
+    "markets": {
+      "crypto": ["BTC", "ETH", "SOL", "XRP"],
+      "tradfi": ["QQQ", "SPX", "SPY"]
+    }
   },
   "meta": {
-    "timestamp": "2026-04-14T10:00:00+00:00",
-    "rate_limit": {
-      "limit": 500,
-      "remaining": 498,
-      "reset": "2026-04-15T00:00:00+00:00"
-    }
+    "timestamp": "2026-10-06T10:00:00+00:00"
   }
 }
 ```
