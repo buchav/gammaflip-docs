@@ -6,8 +6,10 @@ description: 'Error codes and how to handle them'
 ## Error format
 
 All errors return a JSON body with `error` and `message`. Branch on `error`, a
-stable slug; `message` is prose and may change. Some errors add hint fields that
-let a client or an agent correct itself:
+stable slug; `message` is prose for humans and may change at any time, so never
+parse it. Errors are never wrapped in the `data` / `meta` envelope used by
+successful responses, on any endpoint, so `response.json()["error"]` is safe
+everywhere. Some errors add hint fields that let a client or an agent correct itself:
 
 ```json
 {
@@ -35,7 +37,7 @@ let a client or an agent correct itself:
 | `200` | OK | — |
 | `400` | Bad Request | Invalid exchange, pair, expiration or parameter |
 | `401` | Unauthorized | Missing or invalid API key |
-| `403` | Forbidden | Plan has no API access, or doesn't include the market |
+| `403` | Forbidden | Plan has no API access (`subscription_required`), or the symbol belongs to a market your plan doesn't cover (`market_not_in_plan`) |
 | `404` | Not Found | Coin or ticker we don't cover, no data for this coin/exchange/expiration, or no history snapshot or file |
 | `405` | Method Not Allowed | `HEAD` on a history file download — use `GET` |
 | `429` | Too Many Requests | Daily request quota or daily history file credits exceeded — see [rate limits](/rate-limits) |
@@ -47,7 +49,10 @@ let a client or an agent correct itself:
 ### `unauthorized` (401)
 
 ```json
-{ "error": "unauthorized", "message": "Invalid or missing API key." }
+{
+  "error": "unauthorized",
+  "message": "Authentication required. Supply an X-API-Key header or Authorization: Bearer <token>."
+}
 ```
 
 Check that:
@@ -56,13 +61,20 @@ Check that:
 - The key hasn't been revoked
 - The key starts with `gex_sk_`
 
+<Note>
+`unauthorized` covers two cases: no credential was supplied, and a credential
+was supplied but did not resolve to a user — the latter returns
+`"Could not resolve a user identity from the supplied credentials."` Both share
+one code deliberately, so you only need a single branch.
+</Note>
+
 ### `subscription_required` (403)
 
 ```json
 {
   "error": "subscription_required",
   "message": "API access is not included in your plan.",
-  "current_tier": "premium"
+  "current_tier": "free"
 }
 ```
 
@@ -81,8 +93,23 @@ Your plan doesn't include API access (a plan entitlement, not a tier name).
 }
 ```
 
-The coin belongs to a market your plan doesn't include. `markets_in_plan` lists
-the markets you can use. [`/me`](/api-reference/me) shows the same.
+Your key is valid and API access is enabled, but the symbol you requested
+belongs to a market your plan doesn't cover. GammaFlip sells **crypto** and
+**tradfi** as separate markets, so the Crypto plan gets this on `SPX` or `QQQ`.
+(The TradFi plan has no API access and gets `subscription_required` instead.)
+
+| Field | Meaning |
+|-------|---------|
+| `market` | The market the requested symbol belongs to: `crypto` or `tradfi` |
+| `current_tier` | Your current plan tier |
+| `markets_in_plan` | The markets you can use; [`/me`](/api-reference/me) shows the same |
+
+Only endpoints taking a `<coin>` path parameter can return this. The discovery
+endpoints (`/exchanges`, `/coins`) list availability rather than market data,
+and are never gated this way.
+
+To fix it, add the market to your subscription, or request a symbol from a
+market you already have.
 
 ### `invalid_exchange` (400)
 
@@ -161,7 +188,10 @@ exchange check. Pick a symbol from the two lists, or call [`/coins`](/api-refere
 ### `no_data` (404)
 
 ```json
-{ "error": "no_data", "message": "No data available for XYZ." }
+{
+  "error": "no_data",
+  "message": "No data available for BTC 25APR26 on bybit."
+}
 ```
 
 The combination of coin/exchange/expiration has no data. Common causes:
@@ -179,12 +209,25 @@ The data source for the market is down. Retry after a short delay.
 ### `rate_limit_exceeded` (429)
 
 ```json
-{ "error": "rate_limit_exceeded", "message": "Daily limit of 500 requests reached." }
+{
+  "error": "rate_limit_exceeded",
+  "message": "Daily limit of 500 requests reached.",
+  "rate_limit": {
+    "limit": 500,
+    "remaining": 0,
+    "reset": "2026-07-28T00:00:00+00:00"
+  }
+}
 ```
 
-There is no `Retry-After` header. Use the `X-RateLimit-Reset` header or the free
-[`/me`](/api-reference/me) to find out when the quota resets. See
-[Rate Limits](/rate-limits) for handling strategies.
+The `rate_limit` object repeats the figures from the `X-RateLimit-*` headers.
+
+<Warning>
+**No `Retry-After` header is sent.** Schedule your retry from
+`X-RateLimit-Reset` (or the identical `rate_limit.reset` in the body).
+</Warning>
+
+See [Rate Limits](/rate-limits) for handling strategies.
 
 ### History errors
 

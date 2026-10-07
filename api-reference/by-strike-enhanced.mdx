@@ -181,6 +181,11 @@ quota (this call counts as 1 request).
   Your plan does not include this coin's market. The body includes `markets_in_plan`.
 </ResponseField>
 
+<ResponseField name="403 market_not_in_plan" type="error">
+  The coin belongs to a market your plan doesn't cover. See
+  [market_not_in_plan](/errors#market_not_in_plan-403).
+</ResponseField>
+
 <ResponseField name="404 no_data" type="error">
   No data for this coin/exchange/expiration combination. Common cause: the
   expiration doesn't exist on that exchange (use `/expirations/` first).

@@ -288,10 +288,12 @@ components:
 
     Error:
       type: object
+      description: >
+        Standard error body. `error` is a stable slug safe to branch on;
+        `message` is human-readable prose that may change and must not be parsed.
+        Errors are never wrapped in the data/meta envelope used by successful
+        responses. Some errors add hint fields.
       required: [error, message]
-      description: |
-        `error` is a stable slug to branch on; `message` is prose and may change.
-        Some errors add hint fields.
       properties:
         error:
           type: string
@@ -305,6 +307,7 @@ components:
             - invalid_expiration
             - invalid_param
             - no_data
+            - unsupported_coin
             - market_unavailable
             - history_not_available
             - range_too_large
@@ -312,6 +315,7 @@ components:
             - no_file
             - files_unavailable
             - history_files_limit_exceeded
+            - method_not_allowed
           example: "invalid_exchange"
         message:
           type: string
@@ -350,14 +354,27 @@ components:
           example: ["2026-10-05T20:15:00Z", "2026-10-05T13:45:00Z"]
         market:
           type: string
-          description: With `market_not_in_plan`.
+          description: With `market_not_in_plan`; the market the requested coin belongs to.
+          enum: [crypto, tradfi]
+          example: "tradfi"
         markets_in_plan:
           type: array
           items: { type: string }
           description: With `market_not_in_plan`.
+        supported_crypto:
+          type: array
+          items: { type: string }
+          description: With `unsupported_coin`; crypto coins listed by at least one exchange.
+          example: ["BTC", "ETH", "HYPE", "SOL", "XRP"]
+        supported_tradfi:
+          type: array
+          items: { type: string }
+          description: With `unsupported_coin`; US tickers we track.
+          example: ["QQQ", "SPX", "SPY"]
         rate_limit:
-          $ref: '#/components/schemas/RateLimit'
-          description: With `rate_limit_exceeded` and `history_files_limit_exceeded`.
+          allOf:
+            - $ref: '#/components/schemas/RateLimit'
+          description: With `rate_limit_exceeded` and `history_files_limit_exceeded`; mirrors the X-RateLimit-* headers.
 
   parameters:
     Exchange:
@@ -415,7 +432,9 @@ components:
 
   responses:
     Unauthorized:
-      description: Invalid or missing API key
+      description: >
+        Missing or invalid credential, or a credential that does not resolve to
+        a user. Both return `unauthorized`.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
