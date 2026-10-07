@@ -35,10 +35,12 @@ testing, but API keys are the recommended method for bots and scripts.
 API access is a **plan entitlement** (`api_access`), not a tier name. Accounts
 without it get `403 subscription_required`. The trial includes API access.
 
-| Plan | Daily quota | Max keys |
-|------|-------------|----------|
-| Trial (14 days) | 50 req/day | 1 |
-| Other plans with API access | 500 req/day | 5 |
+| Plan | API access | Markets in the API | Daily quota | Max keys |
+|------|------------|--------------------|-------------|----------|
+| Trial (3 days) | Yes | crypto + tradfi | 50 req/day | 1 |
+| Crypto | Yes | crypto | 500 req/day | 5 |
+| Complete | Yes | crypto + tradfi | 500 req/day | 5 |
+| TradFi | No | — | — | — |
 
 Each plan also lists the **markets** it includes (`crypto`, `tradfi`). A request
 for a coin from a market your plan does not include returns
