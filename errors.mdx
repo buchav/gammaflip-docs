@@ -26,6 +26,7 @@ let a client or an agent correct itself:
 | `max_window_days` | `range_too_large` |
 | `nearest_timestamps` | `no_snapshot` |
 | `markets_in_plan` | `market_not_in_plan` |
+| `supported_crypto`, `supported_tradfi` | `unsupported_coin` |
 
 ## HTTP status codes
 
@@ -35,7 +36,7 @@ let a client or an agent correct itself:
 | `400` | Bad Request | Invalid exchange, pair, expiration or parameter |
 | `401` | Unauthorized | Missing or invalid API key |
 | `403` | Forbidden | Plan has no API access, or doesn't include the market |
-| `404` | Not Found | No data available for this coin/exchange/expiration, or no history snapshot or file |
+| `404` | Not Found | Coin or ticker we don't cover, no data for this coin/exchange/expiration, or no history snapshot or file |
 | `405` | Method Not Allowed | `HEAD` on a history file download — use `GET` |
 | `429` | Too Many Requests | Daily request quota or daily history file credits exceeded — see [rate limits](/rate-limits) |
 | `500` | Server Error | Something went wrong on our side — retry or contact support |
@@ -142,6 +143,21 @@ endpoints it also covers an unparseable `start`, `end`, `at`, `date` or `cursor`
 `file` (`valid_values`), and `?compare=` other than `1d`, `7d`, `30d` or used
 with a single expiration.
 
+### `unsupported_coin` (404)
+
+```json
+{
+  "error": "unsupported_coin",
+  "message": "GOOGL is not supported. Crypto coins and US tickers we cover are listed in supported_crypto / supported_tradfi (also GET /api/v1/coins).",
+  "supported_crypto": ["BTC", "ETH", "HYPE", "SOL", "XRP"],
+  "supported_tradfi": ["AAPL", "AMD", "AMZN", "DIA", "DJX", "GLD", "IBIT", "IWM", "META", "MSFT", "NVDA", "QQQ", "RUT", "SLV", "SPX", "SPY", "TSLA"]
+}
+```
+
+The coin is neither a crypto coin on any of our exchanges nor a US ticker we track.
+Returned by every `{exchange}/{coin}` endpoint, including history, before any
+exchange check. Pick a symbol from the two lists, or call [`/coins`](/api-reference/coins).
+
 ### `no_data` (404)
 
 ```json
@@ -151,7 +167,6 @@ with a single expiration.
 The combination of coin/exchange/expiration has no data. Common causes:
 - The exchange doesn't list options for this coin (e.g., OKX doesn't have XRP)
 - The expiration has already expired
-- The basecoin is mistyped (must be uppercase)
 
 ### `market_unavailable` (503)
 
