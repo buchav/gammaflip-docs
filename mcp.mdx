@@ -1,0 +1,82 @@
+---
+title: 'Claude and ChatGPT (MCP)'
+description: 'Use GammaFlip data from an AI assistant: connect once, sign in, ask in plain words'
+---
+
+GammaFlip has a remote MCP server. Add it to Claude or ChatGPT as a connector, sign in
+with your GammaFlip account, and the assistant can read the same data this API serves.
+There is no API key to create.
+
+**Server URL**
+
+```
+https://mcp.gammaflip.io/mcp
+```
+
+<Card title="Step-by-step setup with screenshots" icon="book-open" href="https://gammaflip.io/blog/connect-gammaflip-to-claude-and-chatgpt/">
+  Claude and ChatGPT, the example prompt, and what the assistant can and cannot do.
+</Card>
+
+## Connect
+
+<Tabs>
+  <Tab title="Claude">
+    1. Open **Customize → Connectors**, click **Add**, then **Add custom connector**.
+    2. Name it GammaFlip and paste the server URL.
+    3. Keep the detected settings, click **Add**, then **Connect**.
+    4. Sign in with your GammaFlip account and click **Allow**.
+  </Tab>
+  <Tab title="Claude Code">
+    ```bash
+    claude mcp add --transport http gammaflip https://mcp.gammaflip.io/mcp
+    ```
+    Then run `/mcp` and authenticate.
+  </Tab>
+  <Tab title="ChatGPT">
+    1. Open **Settings → Plugins → Browse directory**.
+    2. Click **Add**, then **Add custom MCP server**.
+    3. Name: GammaFlip. Server URL as above. Authentication: OAuth. Confirm and click **Create as a plugin**.
+    4. Click **Continue to GammaFlip**, sign in and click **Allow**.
+  </Tab>
+</Tabs>
+
+Menu names in both apps change from time to time. The server URL is the only thing you need.
+
+## Access and limits
+
+Access follows the same rule as the API: any plan or trial that includes API access, for
+the [markets](/markets-and-exchanges) in that plan. Requests share your
+[daily quota](/rate-limits) with the REST API. The lookups marked "No" below are free.
+
+## Tools
+
+All tools are read-only. Each one wraps an API endpoint and returns the same JSON,
+so the [data dictionary](/data-dictionary) applies unchanged.
+
+| Tool | Endpoint | Counts against the quota |
+|---|---|---|
+| `get_levels` | [`/levels`](/api-reference/levels), with `compare` | Yes |
+| `get_gex_by_strike` | [`/gex/by-strike-enhanced`](/api-reference/by-strike-enhanced) | Yes |
+| `get_term_structure` | [`/gex/term-oi`](/api-reference/term-oi) | Yes |
+| `get_levels_history` | [`/history/levels`](/api-reference/history-levels) | Yes |
+| `get_snapshot_at` | [`/history/snapshot`](/api-reference/history-snapshot) | Yes |
+| `list_symbols` | [`/exchanges`](/api-reference/exchanges) + [`/coins`](/api-reference/coins) + [`/me`](/api-reference/me) | No |
+| `list_expirations` | [`/expirations`](/api-reference/expirations) | No |
+| `get_history_coverage` | [`/history/coverage`](/api-reference/history-coverage) | No |
+| `get_account` | [`/me`](/api-reference/me) | No |
+
+Not available through MCP: history file downloads ([`/history/files`](/api-reference/history-files)),
+chart images, alerts, and anything that changes your account.
+
+## Errors
+
+Plan, market and quota problems come back as a tool error with a plain explanation, not as
+a sign-in prompt:
+
+- **"Does not have an active plan or trial"**: the account has no API access.
+- **"The … market is not included in this account's plan"**: the symbol is outside your plan.
+- **"Daily request limit … has been reached"**: the quota resets at midnight UTC.
+- **"Temporarily unavailable"**: try again in a minute.
+
+For anything the assistant gets wrong about a symbol or a parameter, the tool error repeats
+the API's own message; see [Errors](/errors).
