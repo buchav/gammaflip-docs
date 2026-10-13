@@ -39,6 +39,8 @@ curl "https://api.gammaflip.io/api/v1/levels/deribit+derive/ETH" \
   -H "X-API-Key: gex_sk_your_key_here"
 ```
 
+Listing four venues explicitly, `deribit+bybit+okx+derive`, is now a subset that excludes Binance; use `all` or `combined` for every venue.
+
 ## TradFi
 
 TradFi tickers have a single venue, `tradfi`. For a TradFi ticker `all` and
