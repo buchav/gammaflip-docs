@@ -8,7 +8,7 @@ The API serves two markets. Which one a request belongs to is decided by the
 
 | Market | Coins | `{exchange}` values |
 |--------|-------|---------------------|
-| `crypto` | `BTC`, `ETH`, `SOL`, … | `bybit`, `deribit`, `okx`, `derive`, `all` / `combined`, or a subset such as `deribit+derive` |
+| `crypto` | `BTC`, `ETH`, `SOL`, … | `bybit`, `deribit`, `okx`, `derive`, `binance`, `all` / `combined`, or a subset such as `deribit+derive` |
 | `tradfi` | US index, ETF and equity tickers such as `SPX`, `SPY`, `QQQ`, `IWM` | `tradfi` (aliases: `all`, `combined`) |
 
 Call [`/exchanges`](/api-reference/exchanges) and [`/coins`](/api-reference/coins)
@@ -23,8 +23,10 @@ market your plan does not include returns `403 market_not_in_plan` with
 
 ## Crypto venues
 
-`bybit`, `deribit`, `okx` and `derive` are single venues. `all` (or `combined`)
+`bybit`, `deribit`, `okx`, `derive` and `binance` are single venues. `all` (or `combined`)
 merges every venue that is currently available for the coin.
+
+`binance` covers BTC, ETH, SOL and XRP; it has no HYPE options. Its history starts on the launch date.
 
 ### Subsets
 
@@ -36,6 +38,8 @@ Order and duplicates do not matter: the response reports the canonical form in
 curl "https://api.gammaflip.io/api/v1/levels/deribit+derive/ETH" \
   -H "X-API-Key: gex_sk_your_key_here"
 ```
+
+Listing four venues explicitly, `deribit+bybit+okx+derive`, is now a subset that excludes Binance; use `all` or `combined` for every venue.
 
 ## TradFi
 
@@ -60,7 +64,7 @@ See [Errors](/errors) for the full catalog.
 
 ## Historical data
 
-[History](/history) is stored per single venue (`bybit`, `deribit`, `okx`, `derive`),
+[History](/history) is stored per single venue (`bybit`, `deribit`, `okx`, `derive`, `binance`),
 for `combined` (all crypto venues merged) and for `tradfi`. As for live data, `all`
 and `combined` with a TradFi ticker resolve to `tradfi`. **Venue subsets such as
 `deribit+derive` have no history** and return `400 history_not_available` with

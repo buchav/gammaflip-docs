@@ -8,7 +8,7 @@ description: 'Returns available exchanges grouped by market. Free: not counted a
 
 <ResponseField name="data.available" type="array">
   List of exchange names currently online and queryable. Supported:
-  `bybit`, `deribit`, `okx`, `derive` and `tradfi`.
+  `bybit`, `deribit`, `okx`, `derive`, `binance` and `tradfi`.
 </ResponseField>
 
 <ResponseField name="data.markets" type="object">
@@ -64,10 +64,10 @@ console.log(await resp.json());
 ```json 200 OK
 {
   "data": {
-    "available": ["bybit", "deribit", "okx", "derive", "tradfi"],
+    "available": ["bybit", "deribit", "okx", "derive", "binance", "tradfi"],
     "virtual": ["all"],
     "markets": {
-      "crypto": ["deribit", "bybit", "okx", "derive"],
+      "crypto": ["deribit", "bybit", "okx", "derive", "binance"],
       "tradfi": ["tradfi"]
     }
   },

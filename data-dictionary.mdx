@@ -33,7 +33,7 @@ table.
 | `timestamp_utc` | ISO 8601 `Z` | Capture time, aligned to :00/:15/:30/:45. **History**; live: `meta.as_of` |
 | `session_date` | date | UTC date (crypto) or US trading date (TradFi). **History** |
 | `type` | `intraday` \| `close` | `close` = last capture of a **completed** session; every other row is `intraday`. **History** |
-| `exchange` | string | `bybit`, `deribit`, `okx`, `derive`, `combined`, `tradfi`. Live: `meta.exchange_resolved` |
+| `exchange` | string | `bybit`, `deribit`, `okx`, `derive`, `binance`, `combined`, `tradfi`. Live: `meta.exchange_resolved` |
 | `symbol` | string | `BTC`, `ETH`, …, `SPX`, `QQQ`, … Live: `meta.symbol` |
 | `expiration` | `TOTAL` \| date | `TOTAL` = all expirations captured at that moment (TradFi: ≤ 90 DTE). Live: returned in `data` of `/levels`, and as `meta.expiration` / `meta.expiration_iso` |
 | `dte` | number \| empty | Calendar days to expiration; empty for TOTAL. **History**; live: `expirations_detail[].dte` from [`/expirations`](/api-reference/expirations) |

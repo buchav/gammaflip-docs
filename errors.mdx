@@ -15,7 +15,7 @@ everywhere. Some errors add hint fields that let a client or an agent correct it
 {
   "error": "invalid_exchange",
   "message": "Exchange 'kraken' is not available.",
-  "valid_exchanges": ["deribit", "bybit", "okx", "derive", "combined"]
+  "valid_exchanges": ["deribit", "bybit", "okx", "derive", "binance", "combined"]
 }
 ```
 
@@ -117,11 +117,11 @@ market you already have.
 {
   "error": "invalid_exchange",
   "message": "Exchange 'kraken' is not available.",
-  "valid_exchanges": ["deribit", "bybit", "okx", "derive", "combined"]
+  "valid_exchanges": ["deribit", "bybit", "okx", "derive", "binance", "combined"]
 }
 ```
 
-For crypto coins valid values are `bybit`, `deribit`, `okx`, `derive`,
+For crypto coins valid values are `bybit`, `deribit`, `okx`, `derive`, `binance`,
 `all` / `combined`, or a subset like `deribit+derive`; `valid_exchanges` lists
 what is currently available. See [Markets and exchanges](/markets-and-exchanges).
 
@@ -239,7 +239,7 @@ The [history endpoints](/history) add these slugs.
 {
   "error": "history_not_available",
   "message": "History is kept per exchange and for 'combined', not for subsets.",
-  "valid_exchanges": ["bybit", "deribit", "okx", "derive", "combined"]
+  "valid_exchanges": ["bybit", "deribit", "okx", "derive", "binance", "combined"]
 }
 ```
 

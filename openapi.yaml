@@ -4,7 +4,7 @@ info:
   version: '1.0.0'
   description: |
     Programmatic access to Gamma Exposure (GEX) data for crypto options
-    (Bybit, Deribit, OKX, Derive) and US options (the `tradfi` exchange).
+    (Bybit, Deribit, OKX, Derive, Binance) and US options (the `tradfi` exchange).
 
     API access is a plan entitlement (`api_access`). The trial includes it
     (50 requests/day); other plans with API access get 500 requests/day.
@@ -328,7 +328,7 @@ components:
           type: array
           items: { type: string }
           description: With `invalid_exchange`, `invalid_pair` and `history_not_available`.
-          example: ["deribit", "bybit", "okx", "derive", "combined"]
+          example: ["deribit", "bybit", "okx", "derive", "binance", "combined"]
         nearest_expirations:
           type: array
           items: { type: string }
@@ -382,7 +382,7 @@ components:
       in: path
       required: true
       description: |
-        Crypto: `bybit`, `deribit`, `okx`, `derive`, `all` / `combined`, or a `+`-joined
+        Crypto: `bybit`, `deribit`, `okx`, `derive`, `binance`, `all` / `combined`, or a `+`-joined
         subset such as `deribit+derive`. TradFi tickers: `tradfi` (`all` and `combined`
         are aliases). Use `/exchanges` for the live list.
       schema:
@@ -401,7 +401,7 @@ components:
       in: path
       required: true
       description: |
-        `bybit`, `deribit`, `okx`, `derive`, `combined` or `tradfi`. `all` and `combined`
+        `bybit`, `deribit`, `okx`, `derive`, `binance`, `combined` or `tradfi`. `all` and `combined`
         with a TradFi ticker resolve to `tradfi`. Venue subsets such as `deribit+derive`
         have no history: `400 history_not_available`.
       schema:
@@ -499,7 +499,7 @@ paths:
                           available:
                             type: array
                             items: { type: string }
-                            example: ["bybit", "deribit", "okx", "derive", "tradfi"]
+                            example: ["bybit", "deribit", "okx", "derive", "binance", "tradfi"]
                           virtual:
                             type: array
                             items: { type: string }
