@@ -35,7 +35,7 @@ table.
 | `type` | `intraday` \| `close` | `close` = last capture of a **completed** session; every other row is `intraday`. **History** |
 | `exchange` | string | `bybit`, `deribit`, `okx`, `derive`, `binance`, `combined`, `tradfi`. Live: `meta.exchange_resolved` |
 | `symbol` | string | `BTC`, `ETH`, …, `SPX`, `QQQ`, … Live: `meta.symbol` |
-| `expiration` | `TOTAL` \| date | `TOTAL` = all expirations captured at that moment (TradFi: ≤ 90 DTE). Live: returned in `data` of `/levels`, and as `meta.expiration` / `meta.expiration_iso` |
+| `expiration` | `TOTAL` \| date | `TOTAL` = all expirations captured at that moment (TradFi: ≤ 180 DTE). Live: returned in `data` of `/levels`, and as `meta.expiration` / `meta.expiration_iso` |
 | `dte` | number \| empty | Calendar days to expiration; empty for TOTAL. **History**; live: `expirations_detail[].dte` from [`/expirations`](/api-reference/expirations) |
 | `oi_date` | date | Session whose open interest is used. TradFi: OPRA OI settles once a day, so intraday rows use the previous session's OI. Crypto: live OI, equals `session_date`. **History**; live: `meta.oi_as_of` |
 | `spot` | number | Underlying price at capture |
