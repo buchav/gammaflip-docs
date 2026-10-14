@@ -5,7 +5,9 @@ description: 'Use GammaFlip data from an AI assistant: connect once, sign in, as
 
 GammaFlip has a remote MCP server. Add it to Claude or ChatGPT as a connector, sign in
 with your GammaFlip account, and the assistant can read the same data this API serves.
-There is no API key to create.
+There is no API key to create. In Claude, GammaFlip is listed in the
+[connector directory](https://claude.ai/customize/connectors/id/gammaflip), so you do not
+need the URL there.
 
 **Server URL**
 
@@ -21,10 +23,14 @@ https://mcp.gammaflip.io/mcp
 
 <Tabs>
   <Tab title="Claude">
-    1. Open **Customize → Connectors**, click **Add**, then **Add custom connector**.
-    2. Name it GammaFlip and paste the server URL.
-    3. Keep the detected settings, click **Add**, then **Connect**.
-    4. Sign in with your GammaFlip account and click **Allow**.
+    1. Open **Customize → Connectors → Discover** and search for **GammaFlip**, or open the
+       [listing](https://claude.ai/customize/connectors/id/gammaflip) directly.
+    2. Click **Connect to Claude**.
+    3. Sign in with your GammaFlip account and click **Allow**.
+
+    If the directory is turned off for your organization, add it by URL instead:
+    **Customize → Connectors → Add → Add custom connector**, name it GammaFlip, paste the
+    server URL, keep the detected settings, click **Add**, then **Connect**.
   </Tab>
   <Tab title="Claude Code">
     ```bash
@@ -40,7 +46,7 @@ https://mcp.gammaflip.io/mcp
   </Tab>
 </Tabs>
 
-Menu names in both apps change from time to time. The server URL is the only thing you need.
+Menu names in both apps change from time to time. In Claude, search the connector directory for GammaFlip; elsewhere the server URL is the only thing you need.
 
 ## Access and limits
 
