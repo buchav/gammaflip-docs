@@ -5,9 +5,10 @@ description: 'Use GammaFlip data from an AI assistant: connect once, sign in, as
 
 GammaFlip has a remote MCP server. Add it to Claude or ChatGPT as a connector, sign in
 with your GammaFlip account, and the assistant can read the same data this API serves.
-There is no API key to create. In Claude, GammaFlip is listed in the
-[connector directory](https://claude.ai/customize/connectors/id/gammaflip), so you do not
-need the URL there.
+There is no API key to create. GammaFlip is listed in Claude's
+[connector directory](https://claude.ai/customize/connectors/id/gammaflip) and in ChatGPT's
+[plugin directory](https://chatgpt.com/plugins/plugin_asdk_app_6ace348cacd88191ab927642d0d5bc4c),
+so in either app you can search for it by name. The server URL is only needed to add it by hand.
 
 **Server URL**
 
@@ -39,14 +40,19 @@ https://mcp.gammaflip.io/mcp
     Then run `/mcp` and authenticate.
   </Tab>
   <Tab title="ChatGPT">
-    1. Open **Settings → Plugins → Browse directory**.
-    2. Click **Add**, then **Add custom MCP server**.
-    3. Name: GammaFlip. Server URL as above. Authentication: OAuth. Confirm and click **Create as a plugin**.
-    4. Click **Continue to GammaFlip**, sign in and click **Allow**.
+    1. Open **Plugins** in the sidebar and search for **GammaFlip**, or open the
+       [listing](https://chatgpt.com/plugins/plugin_asdk_app_6ace348cacd88191ab927642d0d5bc4c) directly.
+    2. Add it, sign in with your GammaFlip account and click **Allow**.
+
+    If the plugin directory is hidden in your workspace, add it by URL instead:
+    **Settings → Plugins → Browse directory → Add → Add custom MCP server**, name it GammaFlip,
+    paste the server URL, choose OAuth, confirm and click **Create as a plugin**, then
+    **Continue to GammaFlip**, sign in and click **Allow**. A server you added this way earlier
+    keeps working.
   </Tab>
 </Tabs>
 
-Menu names in both apps change from time to time. In Claude, search the connector directory for GammaFlip; elsewhere the server URL is the only thing you need.
+Menu names in both apps change from time to time. Search the directory for GammaFlip in either app; elsewhere the server URL is the only thing you need.
 
 ## Access and limits
 
